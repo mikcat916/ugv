@@ -48,7 +48,7 @@ backend/
 
 ## 环境要求
 
-- Python 3.10+
+- Python 3.11（推荐）
 - MySQL 8.0+
 - Windows PowerShell 或 Linux Shell
 
@@ -68,12 +68,12 @@ python -m pip install -r requirements.txt
 ```env
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
-MYSQL_USER=root1
-MYSQL_PASSWORD=123456
+MYSQL_USER=root
+MYSQL_PASSWORD=
 MYSQL_DATABASE=robot_monitor
 MYSQL_CHARSET=utf8mb4
 
-SESSION_SECRET=replace-this-in-production
+SESSION_SECRET=dev-local-secret
 
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=admin123
@@ -86,29 +86,52 @@ ALLOW_SELF_REGISTER=0
 
 - 首次启动会自动创建数据库和数据表。
 - 如果管理员账号不存在，会自动初始化。
-- 生产环境必须修改 `SESSION_SECRET`、MySQL 密码和管理员密码。
+- `SESSION_SECRET=dev-local-secret` 和默认管理员账号仅限本地自用。
 - 高德地图必须使用 `Web 端 JS API` 对应的 Key。
 - `ALLOW_SELF_REGISTER=1` 时允许注册；默认关闭。
 
 ## 启动项目
 
+推荐从仓库根目录启动：
+
+```powershell
+cd E:\Code\Project4
+.\start-dev.ps1
+```
+
+手动启动：
+
 ```powershell
 cd E:\Code\Project4\backend
-python -m uvicorn main:app --host 0.0.0.0 --port 8000
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 启动后访问：
 
 - 本机访问：[http://127.0.0.1:8000/login](http://127.0.0.1:8000/login)
 - 健康检查：[http://127.0.0.1:8000/api/health](http://127.0.0.1:8000/api/health)
-- 局域网访问：`http://<服务器局域网IP>:8000/login`
-
-如果服务器前面已经配置了 Nginx HTTPS 反向代理，浏览器访问请优先使用：`https://<服务器局域网IP>/login`。
+- 短健康检查：[http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
+- 调试配置（仅 `DEBUG=1`）：[http://127.0.0.1:8000/debug/config](http://127.0.0.1:8000/debug/config)
 
 说明：
 
-- 浏览器网页定位依赖安全上下文，直接访问 `http://<服务器局域网IP>:8000` 时，Chrome 可能拒绝 Geolocation。
-- 通过 HTTPS 入口访问时，前端会自动把 WebSocket 从 `ws` 切换为 `wss`。
+- 本地开发默认只监听 `127.0.0.1`。
+- 需要局域网访问时再显式使用 `--host 0.0.0.0`。
+
+## 本地数据库重置与测试数据
+
+清空本地开发数据：
+
+```powershell
+mysql -u root -p robot_monitor < db\reset-db-dev.sql
+python ..\scripts\create_database.py --with-device-pin
+```
+
+导入测试数据：
+
+```powershell
+mysql -u root -p robot_monitor < db\seed-dev.sql
+```
 
 ## 默认账号
 

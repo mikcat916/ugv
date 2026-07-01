@@ -175,6 +175,10 @@ def mysql_settings() -> dict[str, Any]:
     }
 
 
+def debug_enabled() -> bool:
+    return os.getenv("DEBUG", "0").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def get_server_db():
     settings = mysql_settings()
     return pymysql.connect(
@@ -515,7 +519,7 @@ def template_user(user: dict[str, Any] | None) -> dict[str, str] | None:
 
 
 def session_secret() -> str:
-    return os.getenv("SESSION_SECRET", "change-me")
+    return os.getenv("SESSION_SECRET", "dev-local-secret")
 
 
 def user_session_signature(user: dict[str, Any]) -> str:
@@ -900,7 +904,7 @@ def require_api_login(request: Request) -> dict[str, Any]:
 
 
 def self_registration_allowed() -> bool:
-    raw = os.getenv("ALLOW_SELF_REGISTER", "1").strip().lower()
+    raw = os.getenv("ALLOW_SELF_REGISTER", "0").strip().lower()
     return raw not in {"0", "false", "no", "off"}
 
 
@@ -1889,7 +1893,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="机器人巡检平台", lifespan=lifespan)
-app.add_middleware(SessionMiddleware, secret_key=os.getenv("SESSION_SECRET", "change-me"))
+app.add_middleware(SessionMiddleware, secret_key=os.getenv("SESSION_SECRET", "dev-local-secret"))
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
@@ -2098,6 +2102,45 @@ async def api_health() -> JSONResponse:
         "timestamp": datetime.now().isoformat(timespec="seconds"),
     }
     return JSONResponse(payload, status_code=200 if ready else 503)
+
+
+@app.get("/health")
+async def health() -> JSONResponse:
+    return await api_health()
+
+
+@app.get("/debug/config")
+async def debug_config() -> JSONResponse:
+    if not debug_enabled():
+        raise HTTPException(status_code=404, detail="Not Found")
+    mysql = mysql_settings()
+    payload = {
+        "debug": True,
+        "backend": {
+            "host": os.getenv("BACKEND_HOST", "127.0.0.1"),
+            "port": int(os.getenv("BACKEND_PORT", "8000") or "8000"),
+        },
+        "mysql": {
+            "host": mysql["host"],
+            "port": mysql["port"],
+            "user": mysql["user"],
+            "database": mysql["database"],
+            "charset": mysql["charset"],
+            "passwordConfigured": bool(mysql["password"]),
+            "ready": mysql_ready(),
+        },
+        "auth": {
+            "adminUsername": admin_username(),
+            "allowSelfRegister": self_registration_allowed(),
+            "sessionSecretConfigured": bool(os.getenv("SESSION_SECRET", "")),
+        },
+        "paths": {
+            "root": str(ROOT_DIR),
+            "backend": str(BASE_DIR),
+            "schema": str(SCHEMA_FILE),
+        },
+    }
+    return JSONResponse(payload)
 
 
 @app.websocket("/ws/dashboard")

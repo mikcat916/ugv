@@ -47,15 +47,15 @@ def test_login_page_available_without_mysql():
         response = client.get("/login")
     assert response.status_code == 200
     assert "机器人巡检平台" in response.text
-    assert "注册" in response.text
+    assert "注册并进入" not in response.text
 
 
-def test_login_page_enables_registration_by_default(monkeypatch):
+def test_login_page_disables_registration_by_default(monkeypatch):
     monkeypatch.delenv("ALLOW_SELF_REGISTER", raising=False)
     with TestClient(app_module.app) as client:
         response = client.get("/login")
     assert response.status_code == 200
-    assert "allowSelfRegister: true" in response.text
+    assert "allowSelfRegister: false" in response.text
 
 
 def test_page_requires_login_redirect():
@@ -440,11 +440,44 @@ def test_health_endpoint(monkeypatch):
     app_module.APP_STATE["db_error"] = ""
     with TestClient(app_module.app) as client:
         response = client.get("/api/health")
+        short_response = client.get("/health")
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
     assert payload["mysqlConfigured"] is True
     assert payload["mysqlReady"] is True
+    assert short_response.status_code == 200
+    assert short_response.json()["status"] == "ok"
+
+
+def test_debug_config_requires_debug_mode(monkeypatch):
+    monkeypatch.setenv("DEBUG", "0")
+    monkeypatch.setattr(app_module, "mysql_configured", lambda: False)
+
+    with TestClient(app_module.app) as client:
+        response = client.get("/debug/config")
+
+    assert response.status_code == 404
+
+
+def test_debug_config_redacts_sensitive_values(monkeypatch):
+    monkeypatch.setenv("DEBUG", "1")
+    monkeypatch.setenv("MYSQL_PASSWORD", "super-secret-db-password")
+    monkeypatch.setenv("SESSION_SECRET", "super-secret-session")
+    monkeypatch.setattr(app_module, "mysql_configured", lambda: False)
+    monkeypatch.setattr(app_module, "mysql_ready", lambda: False)
+
+    with TestClient(app_module.app) as client:
+        response = client.get("/debug/config")
+
+    assert response.status_code == 200
+    body = response.text
+    payload = response.json()
+    assert payload["debug"] is True
+    assert payload["mysql"]["passwordConfigured"] is True
+    assert payload["auth"]["sessionSecretConfigured"] is True
+    assert "super-secret-db-password" not in body
+    assert "super-secret-session" not in body
 
 
 def test_websocket_dashboard_connected(monkeypatch):

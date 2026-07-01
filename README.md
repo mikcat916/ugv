@@ -76,15 +76,49 @@ Project4/
 ## 环境要求
 
 - Windows + PowerShell（当前脚本优先按 Windows 开发环境组织）
-- Python 3.10+ 推荐用于后端
-- Python 3.9+ 可用于桌面端
+- Python 3.11 推荐用于后端和桌面端
 - MySQL 8.0+
 
 建议为 `backend` 和 `desktop` 分别准备独立 Python 环境，避免桌面依赖与后端依赖互相影响。
 
+## 本地启动
+
+最短流程：
+
+```text
+1. 复制 .env.example 为 .env，并按本机 MySQL 修改账号密码
+2. 启动 MySQL
+3. 运行 .\start-dev.ps1
+4. 打开 http://127.0.0.1:8000
+```
+
+PowerShell 示例：
+
+```powershell
+cd E:\Code\Project4
+Copy-Item .env.example .env
+notepad .env
+.\start-dev.ps1
+```
+
+`start-dev.ps1` 会自动检查 Python、后端依赖、MySQL 连接和数据库表；数据库不存在时会尝试初始化。
+
+默认本地地址：
+
+- 后端：<http://127.0.0.1:8000>
+- 登录页：<http://127.0.0.1:8000/login>
+- 健康检查：<http://127.0.0.1:8000/api/health>
+- 短健康检查：<http://127.0.0.1:8000/health>
+- 调试配置（仅 `DEBUG=1`）：<http://127.0.0.1:8000/debug/config>
+
+默认本地管理员账号仅限本地自用：
+
+- 用户名：`admin`
+- 密码：`admin123`
+
 ## 配置说明
 
-根目录 `.env` 是共享数据库配置入口，`backend` 和 `desktop` 都会读取这里的配置。
+根目录 `.env` 是共享数据库配置入口，`backend` 和 `desktop` 都会读取这里的配置。建议先从 `.env.example` 复制。
 
 示例：
 
@@ -104,11 +138,12 @@ UAV_DB_USER=your_mysql_user
 UAV_DB_PASSWORD=your_mysql_password
 UAV_DB_NAME=robot_monitor
 
-# 后端可选配置
-SESSION_SECRET=replace-this-in-production
+# 后端可选配置（仅限本地自用默认值）
+SESSION_SECRET=dev-local-secret
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=admin123
 ADMIN_DISPLAY_NAME=系统管理员
+ALLOW_SELF_REGISTER=0
 AMAP_WEB_KEY=your_amap_web_js_key
 ```
 
@@ -117,7 +152,8 @@ AMAP_WEB_KEY=your_amap_web_js_key
 - 后端启动时会优先读取根目录 `.env`，同时兼容 `backend/.env`。
 - 桌面端数据库配置读取 `UAV_DB_*` 变量；未提供时会回退到默认值。
 - `AMAP_WEB_KEY` 仅在需要地图功能时配置。
-- 生产环境请务必修改 `SESSION_SECRET`、管理员账号密码和数据库密码。
+- `ALLOW_SELF_REGISTER=0` 表示默认不开放注册；本地需要临时注册时可以改成 `1`。
+- 默认管理员账号和 `dev-local-secret` 仅限本地自用。
 
 ## 快速开始
 
@@ -159,42 +195,46 @@ python scripts\create_database.py --with-device-pin
 - 执行 `backend/db/mysql_schema.sql`
 - 可选创建桌面端使用的 `device_pin` 表
 
+本地清库重来：
+
+```powershell
+mysql -u root -p robot_monitor < backend\db\reset-db-dev.sql
+python scripts\create_database.py --with-device-pin
+```
+
+导入本地测试数据：
+
+```powershell
+mysql -u root -p robot_monitor < backend\db\seed-dev.sql
+```
+
 ### 3. 启动 Web 后端
 
 最省事的方式：
 
 ```powershell
 cd E:\Code\Project4
-.\start.bat
+.\start-dev.ps1
 ```
 
 或手动启动：
 
 ```powershell
 cd E:\Code\Project4\backend
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-如果是在 Ubuntu 服务器等长期运行场景，建议去掉 `--reload`：
-
-```powershell
-cd E:\Code\Project4\backend
-python -m uvicorn main:app --host 0.0.0.0 --port 8000
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 启动后可访问：
 
-- 局域网 HTTPS 登录页：<https://192.168.31.169/login>
-- 局域网 HTTPS 健康检查：<https://192.168.31.169/api/health>
 - 本机直连登录页：<http://127.0.0.1:8000/login>
 - 本机直连健康检查：<http://127.0.0.1:8000/api/health>
 
 说明：
 
-- 浏览器如需网页定位，优先通过 HTTPS 入口访问，而不是直接访问 `http://<服务器IP>:8000`。
-- `http://<服务器IP>:8000` 更适合后端直连调试；在 Chrome 中通过局域网 HTTP 地址访问时，浏览器定位可能被安全策略拦截。
+- 本地开发默认只绑定 `127.0.0.1`，避免无意暴露到局域网。
+- 如果确实需要局域网访问，可以运行 `.\start-dev.ps1 -HostName 0.0.0.0`。
 
-如果没有在环境变量中覆盖管理员账号，默认登录信息通常为：
+如果没有在环境变量中覆盖管理员账号，默认登录信息为：
 
 - 用户名：`admin`
 - 密码：`admin123`
@@ -204,6 +244,12 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```powershell
 cd E:\Code\Project4\desktop
 python main.py
+```
+
+也可以从根目录运行：
+
+```powershell
+.\start-desktop.ps1
 ```
 
 桌面端会读取根目录 `.env` 中的 `UAV_DB_*` 配置连接数据库。

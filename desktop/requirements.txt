@@ -1,15 +1,11 @@
-PyQt5>=5.15.4
-PyQtWebEngine>=5.15.4
-PyQt-Fluent-Widgets>=1.4.0
+PyQt5>=5.15.10,<5.16
+PyQtWebEngine>=5.15.6,<5.16
+PyQt-Fluent-Widgets>=1.4,<2
 
-pymysql>=1.1.0
-mysql-connector-python>=9.6.0
-requests>=2.32.5
-Pillow>=12.1.1
-loguru>=0.7.3
-
-numpy>=2.4.2
-roslibpy>=2.0.0
-
-PyQt6>=6.10.0
-PyQt6-WebEngine>=6.10.0
+pymysql>=1.1,<2
+mysql-connector-python>=9.0,<10
+requests>=2.32,<3
+Pillow>=10,<13
+loguru>=0.7,<1
+numpy>=1.26,<2
+roslibpy>=2.0,<3
