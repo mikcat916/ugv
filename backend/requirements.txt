@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pymysql
+cryptography
+bcrypt
+jinja2
+itsdangerous
+pytest
+httpx
+python-multipart
+websockets
+websockify
+paramiko
+pillow
+pyyaml

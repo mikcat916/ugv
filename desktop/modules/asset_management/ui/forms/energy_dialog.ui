@@ -1,0 +1,50 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>EnergyDialog</class>
+ <widget class="QDialog" name="EnergyDialog">
+  <property name="geometry"><rect><x>0</x><y>0</y><width>620</width><height>780</height></rect></property>
+  <property name="minimumSize"><size><width>520</width><height>640</height></size></property>
+  <property name="windowTitle"><string>能量信息</string></property>
+  <property name="modal"><bool>true</bool></property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="spacing"><number>16</number></property>
+   <property name="leftMargin"><number>24</number></property>
+   <property name="topMargin"><number>24</number></property>
+   <property name="rightMargin"><number>24</number></property>
+   <property name="bottomMargin"><number>24</number></property>
+   <item><widget class="QLabel" name="titleLabel"><property name="text"><string>能量信息</string></property><property name="objectName"><string notr="true">titleLabel</string></property></widget></item>
+   <item>
+    <widget class="QGroupBox" name="groupBox">
+     <property name="title"><string>能量字段</string></property>
+     <layout class="QFormLayout" name="formLayout">
+      <property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property>
+      <item row="0" column="0"><widget class="QLabel" name="labelDevice"><property name="text"><string>选择设备 *</string></property></widget></item>
+      <item row="0" column="1"><widget class="QComboBox" name="deviceCombo"/></item>
+      <item row="1" column="0"><widget class="QLabel" name="labelVddIn"><property name="text"><string>输入功率</string></property></widget></item>
+      <item row="1" column="1"><widget class="QDoubleSpinBox" name="vddinSpin"><property name="suffix"><string> W</string></property><property name="decimals"><number>2</number></property><property name="maximum"><double>100000.000000000000000</double></property></widget></item>
+      <item row="2" column="0"><widget class="QLabel" name="labelSoc"><property name="text"><string>模块功耗</string></property></widget></item>
+      <item row="2" column="1"><widget class="QDoubleSpinBox" name="vddsocSpin"><property name="suffix"><string> W</string></property><property name="decimals"><number>2</number></property><property name="maximum"><double>100000.000000000000000</double></property></widget></item>
+      <item row="3" column="0"><widget class="QLabel" name="labelCpu"><property name="text"><string>算力功耗</string></property></widget></item>
+      <item row="3" column="1"><widget class="QDoubleSpinBox" name="vddcpuSpin"><property name="suffix"><string> W</string></property><property name="decimals"><number>2</number></property><property name="maximum"><double>100000.000000000000000</double></property></widget></item>
+      <item row="4" column="0"><widget class="QLabel" name="labelVolt"><property name="text"><string>算力电压</string></property></widget></item>
+      <item row="4" column="1"><widget class="QDoubleSpinBox" name="computeVoltageSpin"><property name="suffix"><string> V</string></property><property name="decimals"><number>2</number></property><property name="maximum"><double>100000.000000000000000</double></property></widget></item>
+      <item row="5" column="0"><widget class="QLabel" name="labelCurr"><property name="text"><string>算力电流</string></property></widget></item>
+      <item row="5" column="1"><widget class="QDoubleSpinBox" name="computeCurrentSpin"><property name="suffix"><string> A</string></property><property name="decimals"><number>2</number></property><property name="maximum"><double>100000.000000000000000</double></property></widget></item>
+      <item row="6" column="0"><widget class="QLabel" name="labelUptime"><property name="text"><string>稳定运行时长</string></property></widget></item>
+      <item row="6" column="1"><widget class="QTimeEdit" name="uptimeEdit"><property name="displayFormat"><string>HH:mm:ss</string></property></widget></item>
+      <item row="7" column="0"><widget class="QLabel" name="labelBattery"><property name="text"><string>剩余电量</string></property></widget></item>
+      <item row="7" column="1"><widget class="QSpinBox" name="batteryLevelSpin"><property name="maximum"><number>100</number></property><property name="suffix"><string> %</string></property></widget></item>
+      <item row="8" column="0"><widget class="QLabel" name="labelTime"><property name="text"><string>记录时间</string></property></widget></item>
+      <item row="8" column="1"><widget class="QDateTimeEdit" name="timestampEdit"><property name="calendarPopup"><bool>true</bool></property><property name="displayFormat"><string>yyyy-MM-dd HH:mm:ss</string></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+   <item><spacer name="verticalSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer></item>
+   <item><layout class="QHBoxLayout" name="buttonLayout"><item><spacer name="horizontalSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item><item><widget class="QPushButton" name="cancelBtn"><property name="text"><string>取消</string></property></widget></item><item><widget class="QPushButton" name="saveBtn"><property name="text"><string>保存</string></property></widget></item></layout></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection><sender>cancelBtn</sender><signal>clicked()</signal><receiver>EnergyDialog</receiver><slot>reject()</slot></connection>
+ </connections>
+</ui>

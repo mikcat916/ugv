@@ -1,0 +1,449 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>TaskExecutionManagement</class>
+ <widget class="QWidget" name="TaskExecutionManagement">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>980</width>
+    <height>560</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>任务执行管理</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">
+QWidget#TaskExecutionManagement{
+    background-color: white;
+}
+
+QFrame#titleBar{
+    background-color: white;
+    border: 1px solid #999999;
+}
+
+QFrame#mainFrame{
+    background-color: white;
+    border: 2px solid #2c3e50;
+}
+
+QPushButton#btnBack,
+QPushButton#btnMax,
+QPushButton#btnClose{
+    font: 18px "Microsoft YaHei";
+    border: 1px solid #2c3e50;
+    border-radius: 6px;
+    background-color: #f8f8f8;
+    min-width: 30px;
+    min-height: 30px;
+}
+
+QPushButton#btnBack:hover,
+QPushButton#btnMax:hover,
+QPushButton#btnClose:hover{
+    background-color: #eaeaea;
+}
+   </string>
+  </property>
+
+  <layout class="QVBoxLayout" name="verticalLayoutRoot">
+   <property name="leftMargin">
+    <number>10</number>
+   </property>
+   <property name="topMargin">
+    <number>10</number>
+   </property>
+   <property name="rightMargin">
+    <number>10</number>
+   </property>
+   <property name="bottomMargin">
+    <number>10</number>
+   </property>
+   <property name="spacing">
+    <number>8</number>
+   </property>
+
+   <!-- TitleBar -->
+   <item>
+    <widget class="QFrame" name="titleBar">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>55</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>55</height>
+      </size>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+
+     <layout class="QHBoxLayout" name="horizontalLayoutTitle">
+      <property name="leftMargin">
+       <number>10</number>
+      </property>
+      <property name="rightMargin">
+       <number>10</number>
+      </property>
+      <property name="spacing">
+       <number>10</number>
+      </property>
+
+      <item>
+       <widget class="QPushButton" name="btnBack">
+        <property name="text">
+         <string>&lt;</string>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>40</width>
+          <height>30</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>40</width>
+          <height>30</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+
+      <item>
+       <spacer name="spacerLeft">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+
+      <item>
+       <widget class="QLabel" name="lblTitle">
+        <property name="text">
+         <string>任务执行管理</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">
+font: 20px "Microsoft YaHei";
+color: black;
+         </string>
+        </property>
+       </widget>
+      </item>
+
+      <item>
+       <spacer name="spacerRight">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+
+      <item>
+       <widget class="QPushButton" name="btnMax">
+        <property name="text">
+         <string>□</string>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>30</width>
+          <height>30</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>30</width>
+          <height>30</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+
+      <item>
+       <widget class="QPushButton" name="btnClose">
+        <property name="text">
+         <string>X</string>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>30</width>
+          <height>30</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>30</width>
+          <height>30</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+
+     </layout>
+    </widget>
+   </item>
+
+   <!-- Main Frame -->
+   <item>
+    <widget class="QFrame" name="mainFrame">
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+
+     <layout class="QVBoxLayout" name="verticalLayoutMain">
+      <property name="leftMargin">
+       <number>5</number>
+      </property>
+      <property name="topMargin">
+       <number>5</number>
+      </property>
+      <property name="rightMargin">
+       <number>5</number>
+      </property>
+      <property name="bottomMargin">
+       <number>5</number>
+      </property>
+
+      <item>
+       <widget class="QWidget" name="canvasArea">
+        <property name="styleSheet">
+         <string notr="true">
+QPushButton{
+    border: 2px solid #5dade2;
+    background-color: white;
+    font: 16px "Microsoft YaHei";
+}
+QPushButton:hover{
+    background-color: #ecf5ff;
+}
+         </string>
+        </property>
+
+        <!-- Bubble Buttons -->
+        <widget class="QPushButton" name="btnMapBuild">
+         <property name="geometry">
+          <rect>
+           <x>250</x>
+           <y>50</y>
+           <width>200</width>
+           <height>200</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>地图构建</string>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">border-radius: 100px;</string>
+         </property>
+        </widget>
+
+        <widget class="QPushButton" name="btnTargetIdentify">
+         <property name="geometry">
+          <rect>
+           <x>520</x>
+           <y>40</y>
+           <width>140</width>
+           <height>140</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>目标
+识别</string>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">border-radius: 70px;</string>
+         </property>
+        </widget>
+
+        <widget class="QPushButton" name="btnObstacleAvoid">
+         <property name="geometry">
+          <rect>
+           <x>560</x>
+           <y>200</y>
+           <width>180</width>
+           <height>180</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>智能避
+障</string>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">border-radius: 90px;</string>
+         </property>
+        </widget>
+
+        <widget class="QPushButton" name="btnWaitDev">
+         <property name="geometry">
+          <rect>
+           <x>750</x>
+           <y>250</y>
+           <width>200</width>
+           <height>200</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>待开发</string>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">border-radius: 100px;</string>
+         </property>
+        </widget>
+
+        <widget class="QPushButton" name="btnTargetTrack">
+         <property name="geometry">
+          <rect>
+           <x>140</x>
+           <y>250</y>
+           <width>170</width>
+           <height>170</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>目标跟
+踪</string>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">border-radius: 85px;</string>
+         </property>
+        </widget>
+
+        <widget class="QPushButton" name="btnFixedPatrol">
+         <property name="geometry">
+          <rect>
+           <x>380</x>
+           <y>220</y>
+           <width>120</width>
+           <height>120</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>定点
+巡逻</string>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">border-radius: 60px;</string>
+         </property>
+        </widget>
+
+        <widget class="QPushButton" name="btnExploreAuto">
+         <property name="geometry">
+          <rect>
+           <x>410</x>
+           <y>350</y>
+           <width>120</width>
+           <height>120</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>探索
+自主</string>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">border-radius: 60px;</string>
+         </property>
+        </widget>
+
+        <!-- Decorative bubbles -->
+        <widget class="QPushButton" name="bubbleSmall1">
+         <property name="geometry">
+          <rect>
+           <x>110</x>
+           <y>140</y>
+           <width>45</width>
+           <height>45</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">border-radius: 22px;</string>
+         </property>
+        </widget>
+
+        <widget class="QPushButton" name="bubbleSmall2">
+         <property name="geometry">
+          <rect>
+           <x>340</x>
+           <y>260</y>
+           <width>55</width>
+           <height>55</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">border-radius: 27px;</string>
+         </property>
+        </widget>
+
+        <widget class="QPushButton" name="bubbleSmall3">
+         <property name="geometry">
+          <rect>
+           <x>680</x>
+           <y>150</y>
+           <width>65</width>
+           <height>65</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">border-radius: 32px;</string>
+         </property>
+        </widget>
+
+        <widget class="QPushButton" name="bubbleSmall4">
+         <property name="geometry">
+          <rect>
+           <x>820</x>
+           <y>130</y>
+           <width>22</width>
+           <height>22</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">border-radius: 11px;</string>
+         </property>
+        </widget>
+
+       </widget>
+      </item>
+
+     </layout>
+    </widget>
+   </item>
+
+  </layout>
+
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

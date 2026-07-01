@@ -1,0 +1,59 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 | 机器人巡检平台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/dashboard.css?v={{ asset_version }}">
+</head>
+<body class="auth-page">
+  <main class="login-panel">
+    <section class="login-card">
+      <p class="eyebrow">安全登录</p>
+      <h1>机器人巡检平台</h1>
+      <p class="muted">使用数据库用户表登录。默认管理员账号来自 `.env`，未设置时为 `admin / admin123`。</p>
+
+      {% if not mysql_ready %}
+      <div class="notice-card danger">
+        <strong>MySQL 当前不可用</strong>
+        <p>{{ mysql_error or '请先在 .env 中设置 MYSQL_HOST、MYSQL_PORT、MYSQL_USER、MYSQL_PASSWORD、MYSQL_DATABASE。' }}</p>
+      </div>
+      {% endif %}
+
+      <div class="auth-switch" role="group" aria-label="登录方式"{% if not allow_self_register %} hidden{% endif %}>
+        <button id="auth-mode-login" class="secondary-button active" type="button" data-auth-mode="login" aria-pressed="true">登录</button>
+        <button id="auth-mode-register" class="secondary-button" type="button" data-auth-mode="register" aria-pressed="false">注册</button>
+      </div>
+
+      <form id="login-form" class="stack-form">
+        <label>
+          <span>用户名</span>
+          <input type="text" name="username" autocomplete="username" required>
+        </label>
+        <label class="register-only" hidden>
+          <span>显示名称</span>
+          <input type="text" name="displayName" autocomplete="nickname" placeholder="留空则默认使用用户名">
+        </label>
+        <label>
+          <span>密码</span>
+          <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <button class="primary-button" type="submit">登录</button>
+        <p id="login-error" class="form-error" role="alert" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    window.APP_CONFIG = {
+      mysqlReady: {{ mysql_ready|tojson }},
+      allowSelfRegister: {{ allow_self_register|tojson }},
+      loginToken: {{ login_token|tojson }}
+    };
+  </script>
+  <script src="/static/login.js?v={{ asset_version }}" defer></script>
+</body>
+</html>

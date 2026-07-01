@@ -1,0 +1,740 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>TaskExecPage</class>
+ <widget class="QWidget" name="TaskExecPage">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1200</width>
+    <height>720</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>任务执行管理</string>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="leftMargin">
+    <number>18</number>
+   </property>
+   <property name="topMargin">
+    <number>18</number>
+   </property>
+   <property name="rightMargin">
+    <number>18</number>
+   </property>
+   <property name="bottomMargin">
+    <number>18</number>
+   </property>
+   <property name="spacing">
+    <number>12</number>
+   </property>
+
+   <!-- Top Bar -->
+   <item>
+    <layout class="QHBoxLayout" name="topBarLayout">
+     <property name="spacing">
+      <number>10</number>
+     </property>
+
+     <item>
+      <widget class="QToolButton" name="btnBack">
+       <property name="minimumSize">
+        <size>
+         <width>44</width>
+         <height>44</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>←</string>
+       </property>
+       <property name="toolTip">
+        <string>返回</string>
+       </property>
+      </widget>
+     </item>
+
+     <item>
+      <spacer name="topLeftSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+
+     <item>
+      <widget class="QLabel" name="labelTitle">
+       <property name="text">
+        <string>任务执行管理</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>44</height>
+        </size>
+       </property>
+      </widget>
+     </item>
+
+     <item>
+      <spacer name="topRightSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+
+     <item>
+      <widget class="QToolButton" name="btnPin">
+       <property name="minimumSize">
+        <size>
+         <width>44</width>
+         <height>44</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>⤢</string>
+       </property>
+       <property name="toolTip">
+        <string>置顶/全屏(占位)</string>
+       </property>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QToolButton" name="btnClose">
+       <property name="minimumSize">
+        <size>
+         <width>44</width>
+         <height>44</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>✕</string>
+       </property>
+       <property name="toolTip">
+        <string>关闭</string>
+       </property>
+      </widget>
+     </item>
+
+    </layout>
+   </item>
+
+   <!-- Main Area: Sidebar + Content -->
+   <item>
+    <layout class="QHBoxLayout" name="mainLayout">
+     <property name="spacing">
+      <number>14</number>
+     </property>
+
+     <!-- Left Sidebar -->
+     <item>
+      <widget class="QFrame" name="frameSidebar">
+       <property name="frameShape">
+        <enum>QFrame::StyledPanel</enum>
+       </property>
+       <property name="frameShadow">
+        <enum>QFrame::Plain</enum>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>92</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>120</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <layout class="QVBoxLayout" name="sidebarLayout">
+        <property name="leftMargin">
+         <number>10</number>
+        </property>
+        <property name="topMargin">
+         <number>10</number>
+        </property>
+        <property name="rightMargin">
+         <number>10</number>
+        </property>
+        <property name="bottomMargin">
+         <number>10</number>
+        </property>
+        <property name="spacing">
+         <number>10</number>
+        </property>
+
+        <item>
+         <widget class="QPushButton" name="btnMapBuild">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>54</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>地图构建</string>
+          </property>
+         </widget>
+        </item>
+
+        <item>
+         <widget class="QPushButton" name="btnFixedPatrol">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>54</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>定点巡逻</string>
+          </property>
+         </widget>
+        </item>
+
+        <item>
+         <widget class="QPushButton" name="btnTargetDetect">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>54</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>目标识别</string>
+          </property>
+         </widget>
+        </item>
+
+        <item>
+         <widget class="QPushButton" name="btnTargetTrack">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>54</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>目标跟踪</string>
+          </property>
+         </widget>
+        </item>
+
+        <item>
+         <widget class="QPushButton" name="btnAutoExplore">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>54</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>自主探索</string>
+          </property>
+         </widget>
+        </item>
+
+        <item>
+         <widget class="QPushButton" name="btnAvoidance">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>54</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>智能避障</string>
+          </property>
+         </widget>
+        </item>
+
+        <item>
+         <widget class="QPushButton" name="btnAirGround">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>54</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>空地协同</string>
+          </property>
+         </widget>
+        </item>
+
+        <item>
+         <widget class="QPushButton" name="btnHumanMachine">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>54</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>人机协同</string>
+          </property>
+         </widget>
+        </item>
+
+        <item>
+         <spacer name="sidebarBottomSpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+
+       </layout>
+      </widget>
+     </item>
+
+     <!-- Right Content Panel -->
+     <item>
+      <widget class="QFrame" name="frameContentRoot">
+       <property name="frameShape">
+        <enum>QFrame::StyledPanel</enum>
+       </property>
+       <property name="frameShadow">
+        <enum>QFrame::Plain</enum>
+       </property>
+       <layout class="QVBoxLayout" name="contentRootLayout">
+        <property name="leftMargin">
+         <number>14</number>
+        </property>
+        <property name="topMargin">
+         <number>14</number>
+        </property>
+        <property name="rightMargin">
+         <number>14</number>
+        </property>
+        <property name="bottomMargin">
+         <number>14</number>
+        </property>
+        <property name="spacing">
+         <number>14</number>
+        </property>
+
+        <!-- Top row: Video + (2D + Avoid) -->
+        <item>
+         <layout class="QHBoxLayout" name="topRowLayout">
+          <property name="spacing">
+           <number>14</number>
+          </property>
+
+          <item>
+           <widget class="QFrame" name="frameVideo">
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Plain</enum>
+            </property>
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+              <horstretch>3</horstretch>
+              <verstretch>3</verstretch>
+             </sizepolicy>
+            </property>
+            <layout class="QVBoxLayout" name="videoLayout">
+             <property name="leftMargin">
+              <number>12</number>
+             </property>
+             <property name="topMargin">
+              <number>12</number>
+             </property>
+             <property name="rightMargin">
+              <number>12</number>
+             </property>
+             <property name="bottomMargin">
+              <number>12</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="labelVideoTitle">
+               <property name="text">
+                <string>实时视频画面</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignLeft|Qt::AlignTop</set>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="videoFillSpacer">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
+          </item>
+
+          <item>
+           <layout class="QVBoxLayout" name="rightTopColLayout">
+            <property name="spacing">
+             <number>14</number>
+            </property>
+
+            <item>
+             <widget class="QFrame" name="frame2D">
+              <property name="frameShape">
+               <enum>QFrame::StyledPanel</enum>
+              </property>
+              <property name="frameShadow">
+               <enum>QFrame::Plain</enum>
+              </property>
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                <horstretch>2</horstretch>
+                <verstretch>2</verstretch>
+               </sizepolicy>
+              </property>
+              <layout class="QVBoxLayout" name="layout2D">
+               <property name="leftMargin">
+                <number>12</number>
+               </property>
+               <property name="topMargin">
+                <number>12</number>
+               </property>
+               <property name="rightMargin">
+                <number>12</number>
+               </property>
+               <property name="bottomMargin">
+                <number>12</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="label2DTitle">
+                 <property name="text">
+                  <string>实时2D画面</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignLeft|Qt::AlignTop</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <spacer name="spacer2DFill">
+                 <property name="orientation">
+                  <enum>Qt::Vertical</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>20</width>
+                   <height>40</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+              </layout>
+             </widget>
+            </item>
+
+            <item>
+             <widget class="QFrame" name="frameAvoidanceSetting">
+              <property name="frameShape">
+               <enum>QFrame::StyledPanel</enum>
+              </property>
+              <property name="frameShadow">
+               <enum>QFrame::Plain</enum>
+              </property>
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                <horstretch>2</horstretch>
+                <verstretch>1</verstretch>
+               </sizepolicy>
+              </property>
+              <layout class="QVBoxLayout" name="avoidLayout">
+               <property name="leftMargin">
+                <number>12</number>
+               </property>
+               <property name="topMargin">
+                <number>12</number>
+               </property>
+               <property name="rightMargin">
+                <number>12</number>
+               </property>
+               <property name="bottomMargin">
+                <number>12</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="labelAvoidTitle">
+                 <property name="text">
+                  <string>避障设置</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignLeft|Qt::AlignTop</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <spacer name="avoidFillSpacer">
+                 <property name="orientation">
+                  <enum>Qt::Vertical</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>20</width>
+                   <height>40</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+              </layout>
+             </widget>
+            </item>
+
+           </layout>
+          </item>
+
+         </layout>
+        </item>
+
+        <!-- Bottom row: Task Info + Controls -->
+        <item>
+         <layout class="QHBoxLayout" name="bottomRowLayout">
+          <property name="spacing">
+           <number>14</number>
+          </property>
+
+          <item>
+           <widget class="QFrame" name="frameTaskInfo">
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Plain</enum>
+            </property>
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+              <horstretch>3</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>160</height>
+             </size>
+            </property>
+            <layout class="QVBoxLayout" name="taskInfoLayout">
+             <property name="leftMargin">
+              <number>12</number>
+             </property>
+             <property name="topMargin">
+              <number>12</number>
+             </property>
+             <property name="rightMargin">
+              <number>12</number>
+             </property>
+             <property name="bottomMargin">
+              <number>12</number>
+             </property>
+
+             <item>
+              <widget class="QLabel" name="labelTaskName">
+               <property name="text">
+                <string>任务名称：</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="labelTaskType">
+               <property name="text">
+                <string>任务类型：</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="labelTaskDistance">
+               <property name="text">
+                <string>已行驶：</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="labelTaskProgress">
+               <property name="text">
+                <string>任务完成度：</string>
+               </property>
+              </widget>
+             </item>
+
+            </layout>
+           </widget>
+          </item>
+
+          <item>
+           <layout class="QVBoxLayout" name="controlLayout">
+            <property name="spacing">
+             <number>14</number>
+            </property>
+
+            <item>
+             <layout class="QHBoxLayout" name="startStopLayout">
+              <property name="spacing">
+               <number>18</number>
+              </property>
+              <item>
+               <spacer name="ctrlLeftSpacer">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>20</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btnStart">
+                <property name="minimumSize">
+                 <size>
+                  <width>150</width>
+                  <height>54</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>开始</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btnPause">
+                <property name="minimumSize">
+                 <size>
+                  <width>150</width>
+                  <height>54</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>暂停</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="ctrlRightSpacer">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>20</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </item>
+
+            <item>
+             <layout class="QHBoxLayout" name="estopLayout">
+              <item>
+               <spacer name="estopLeftSpacer">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>20</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btnEStop">
+                <property name="minimumSize">
+                 <size>
+                  <width>180</width>
+                  <height>60</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>紧急制动</string>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">color: rgb(200, 0, 0);</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="estopRightSpacer">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>20</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </item>
+
+            <item>
+             <spacer name="controlBottomSpacer">
+              <property name="orientation">
+               <enum>Qt::Vertical</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>20</width>
+                <height>40</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+
+           </layout>
+          </item>
+
+         </layout>
+        </item>
+
+       </layout>
+      </widget>
+     </item>
+
+    </layout>
+   </item>
+
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
+

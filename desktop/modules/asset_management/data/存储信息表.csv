@@ -1,0 +1,12 @@
+﻿字段名称,字段CODE,字段类型(长度),示例,说明
+记录ID,MSId,int,,主键
+设备ID,UGVId,int,,关联的设备ID
+物理内存总量,MemTotal,float,7.3GB,总可用物理内存，系统预留后剩余的用户可用内存
+物理内存已使用量,MemUsed,float,2.7GB,所有进程（CPU+GPU）已占用的总内存
+GPU共享内存占用,GPUShared,float,,GPU当前使用的物理内存
+系统缓冲区内存,MemBuffers,float,,用于临时存储磁盘 / 外设数据，如无人车的相机原始帧缓存
+系统缓存内存,MemCached,float,,用于缓存已读取的文件 / 数据，加速重复访问，如无人车的地图数据缓存
+空闲物理内存,MemFree,float,,完全空闲的物理内存，可直接分配给新进程
+磁盘总量,DiskTotal,float,,GB
+磁盘已使用量,DiskUsed,float,,GB
+记录时间戳,TimeStamp,datetime,,

@@ -1,0 +1,179 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1400</width>
+    <height>820</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>1200</width>
+    <height>700</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>设备信息管理系统</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <item>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="documentMode">
+       <bool>true</bool>
+      </property>
+      <widget class="QWidget" name="deviceTab">
+       <attribute name="title">
+        <string>设备基本信息</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="deviceLayout">
+        <property name="leftMargin">
+         <number>16</number>
+        </property>
+        <property name="topMargin">
+         <number>10</number>
+        </property>
+        <property name="rightMargin">
+         <number>16</number>
+        </property>
+        <property name="bottomMargin">
+         <number>16</number>
+        </property>
+        <item>
+         <layout class="QHBoxLayout" name="deviceToolbarLayout">
+          <item><widget class="QPushButton" name="deviceAddBtn"><property name="text"><string>新增</string></property></widget></item>
+          <item><widget class="QPushButton" name="deviceEditBtn"><property name="text"><string>编辑</string></property></widget></item>
+          <item><widget class="QPushButton" name="deviceDeleteBtn"><property name="text"><string>删除</string></property></widget></item>
+          <item><widget class="QPushButton" name="deviceRefreshBtn"><property name="text"><string>刷新</string></property></widget></item>
+          <item><spacer name="deviceToolbarSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+          <item><widget class="QLineEdit" name="deviceSearchEdit"><property name="minimumSize"><size><width>260</width><height>0</height></size></property><property name="placeholderText"><string>输入关键字后回车搜索</string></property></widget></item>
+          <item><widget class="QPushButton" name="deviceSearchBtn"><property name="text"><string>搜索</string></property></widget></item>
+          <item><widget class="QPushButton" name="deviceClearBtn"><property name="text"><string>清空</string></property></widget></item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QTableWidget" name="deviceTable">
+          <property name="alternatingRowColors"><bool>true</bool></property>
+          <property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property>
+          <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+          <property name="sortingEnabled"><bool>true</bool></property>
+          <column><property name="text"><string>ID</string></property></column>
+          <column><property name="text"><string>设备编号</string></property></column>
+          <column><property name="text"><string>设备名称</string></property></column>
+          <column><property name="text"><string>设备型号</string></property></column>
+          <column><property name="text"><string>定位方式</string></property></column>
+          <column><property name="text"><string>传感器</string></property></column>
+          <column><property name="text"><string>电池容量(kWh)</string></property></column>
+          <column><property name="text"><string>图片路径</string></property></column>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="storageTab">
+       <attribute name="title">
+        <string>存储信息</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="storageLayout">
+        <property name="leftMargin"><number>16</number></property>
+        <property name="topMargin"><number>10</number></property>
+        <property name="rightMargin"><number>16</number></property>
+        <property name="bottomMargin"><number>16</number></property>
+        <item>
+         <layout class="QHBoxLayout" name="storageToolbarLayout">
+          <item><widget class="QPushButton" name="storageAddBtn"><property name="text"><string>新增</string></property></widget></item>
+          <item><widget class="QPushButton" name="storageEditBtn"><property name="text"><string>编辑</string></property></widget></item>
+          <item><widget class="QPushButton" name="storageDeleteBtn"><property name="text"><string>删除</string></property></widget></item>
+          <item><widget class="QPushButton" name="storageRefreshBtn"><property name="text"><string>刷新</string></property></widget></item>
+          <item><spacer name="storageToolbarSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+          <item><widget class="QLineEdit" name="storageSearchEdit"><property name="minimumSize"><size><width>260</width><height>0</height></size></property><property name="placeholderText"><string>输入关键字后回车搜索</string></property></widget></item>
+          <item><widget class="QPushButton" name="storageSearchBtn"><property name="text"><string>搜索</string></property></widget></item>
+          <item><widget class="QPushButton" name="storageClearBtn"><property name="text"><string>清空</string></property></widget></item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QTableWidget" name="storageTable">
+          <property name="alternatingRowColors"><bool>true</bool></property>
+          <property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property>
+          <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+          <property name="sortingEnabled"><bool>true</bool></property>
+          <column><property name="text"><string>ID</string></property></column>
+          <column><property name="text"><string>设备编号</string></property></column>
+          <column><property name="text"><string>设备名称</string></property></column>
+          <column><property name="text"><string>内存总量(GB)</string></property></column>
+          <column><property name="text"><string>内存已用(GB)</string></property></column>
+          <column><property name="text"><string>内存空闲(GB)</string></property></column>
+          <column><property name="text"><string>磁盘总量(GB)</string></property></column>
+          <column><property name="text"><string>磁盘已用(GB)</string></property></column>
+          <column><property name="text"><string>记录时间</string></property></column>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="computingTab">
+       <attribute name="title">
+        <string>算力信息</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="computingLayout">
+        <property name="leftMargin"><number>16</number></property>
+        <property name="topMargin"><number>10</number></property>
+        <property name="rightMargin"><number>16</number></property>
+        <property name="bottomMargin"><number>16</number></property>
+        <item>
+         <layout class="QHBoxLayout" name="computingToolbarLayout">
+          <item><widget class="QPushButton" name="computingAddBtn"><property name="text"><string>新增</string></property></widget></item>
+          <item><widget class="QPushButton" name="computingEditBtn"><property name="text"><string>编辑</string></property></widget></item>
+          <item><widget class="QPushButton" name="computingDeleteBtn"><property name="text"><string>删除</string></property></widget></item>
+          <item><widget class="QPushButton" name="computingRefreshBtn"><property name="text"><string>刷新</string></property></widget></item>
+          <item><spacer name="computingToolbarSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+          <item><widget class="QLineEdit" name="computingSearchEdit"><property name="minimumSize"><size><width>260</width><height>0</height></size></property><property name="placeholderText"><string>输入关键字后回车搜索</string></property></widget></item>
+          <item><widget class="QPushButton" name="computingSearchBtn"><property name="text"><string>搜索</string></property></widget></item>
+          <item><widget class="QPushButton" name="computingClearBtn"><property name="text"><string>清空</string></property></widget></item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QTableWidget" name="computingTable">
+          <property name="alternatingRowColors"><bool>true</bool></property>
+          <property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property>
+          <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+          <property name="sortingEnabled"><bool>true</bool></property>
+          <column><property name="text"><string>ID</string></property></column>
+          <column><property name="text"><string>设备编号</string></property></column>
+          <column><property name="text"><string>设备名称</string></property></column>
+          <column><property name="text"><string>CPU使用率(%)</string></property></column>
+          <column><property name="text"><string>CPU温度(℃)</string></property></column>
+          <column><property name="text"><string>GPU使用率(%)</string></property></column>
+          <column><property name="text"><string>GPU温度(℃)</string></property></column>
+          <column><property name="text"><string>GPU频率(MHz)</string></property></column>
+          <column><property name="text"><string>记录时间</string></property></column>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,0 +1,795 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1600</width>
+    <height>960</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>无人车目标识别系统</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout_main">
+    <item>
+     <widget class="QFrame" name="frame_header">
+      <property name="frameShape">
+       <enum>QFrame::StyledPanel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Raised</enum>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout_header">
+       <item>
+        <widget class="QLabel" name="label_title">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>48</height>
+          </size>
+         </property>
+         <property name="font">
+          <font>
+           <family>Microsoft YaHei</family>
+           <pointsize>18</pointsize>
+           <bold>true</bold>
+           <weight>75</weight>
+          </font>
+         </property>
+         <property name="text">
+          <string>无人车目标识别系统</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer_header">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_project">
+         <property name="text">
+          <string>模式：实时检测</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_time">
+         <property name="text">
+          <string>时间：--:--:--</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_body">
+      <item>
+       <widget class="QTabWidget" name="tabWidget_left">
+        <property name="minimumSize">
+         <size>
+          <width>980</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="currentIndex">
+         <number>0</number>
+        </property>
+        <widget class="QWidget" name="tab_realtime">
+         <attribute name="title">
+          <string>实时画面</string>
+         </attribute>
+         <layout class="QVBoxLayout" name="verticalLayout_realtime">
+          <item>
+           <widget class="QFrame" name="frame_video">
+            <property name="frameShape">
+             <enum>QFrame::Box</enum>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Sunken</enum>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>600</height>
+             </size>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_video">
+             <item>
+              <widget class="QLabel" name="label_video">
+               <property name="minimumSize">
+                <size>
+                 <width>0</width>
+                 <height>560</height>
+                </size>
+               </property>
+               <property name="frameShape">
+                <enum>QFrame::NoFrame</enum>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+               <property name="text">
+                <string>视频显示区
+(摄像头 / 本地视频 / 仿真画面)</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_video_info">
+            <item>
+             <widget class="QGroupBox" name="groupBox_runtime">
+              <property name="title">
+               <string>运行信息</string>
+              </property>
+              <layout class="QGridLayout" name="gridLayout_runtime">
+               <item row="0" column="0">
+                <widget class="QLabel" name="label_fps_title">
+                 <property name="text">
+                  <string>FPS：</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QLabel" name="label_fps_value">
+                 <property name="text">
+                  <string>0.0</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="2">
+                <widget class="QLabel" name="label_latency_title">
+                 <property name="text">
+                  <string>延迟：</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="3">
+                <widget class="QLabel" name="label_latency_value">
+                 <property name="text">
+                  <string>0 ms</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="0">
+                <widget class="QLabel" name="label_objects_title">
+                 <property name="text">
+                  <string>目标数：</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QLabel" name="label_objects_value">
+                 <property name="text">
+                  <string>0</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="2">
+                <widget class="QLabel" name="label_speed_title">
+                 <property name="text">
+                  <string>车速：</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="3">
+                <widget class="QLabel" name="label_speed_value">
+                 <property name="text">
+                  <string>0 km/h</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+        <widget class="QWidget" name="tab_map">
+         <attribute name="title">
+          <string>感知与地图</string>
+         </attribute>
+         <layout class="QVBoxLayout" name="verticalLayout_map">
+          <item>
+           <widget class="QSplitter" name="splitter_map">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <widget class="QFrame" name="frame_bev">
+             <property name="frameShape">
+              <enum>QFrame::Box</enum>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayout_bev">
+              <item>
+               <widget class="QLabel" name="label_bev">
+                <property name="alignment">
+                 <set>Qt::AlignCenter</set>
+                </property>
+                <property name="text">
+                 <string>BEV / 鸟瞰视图</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QFrame" name="frame_map">
+             <property name="frameShape">
+              <enum>QFrame::Box</enum>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayout_mapview">
+              <item>
+               <widget class="QLabel" name="label_mapview">
+                <property name="alignment">
+                 <set>Qt::AlignCenter</set>
+                </property>
+                <property name="text">
+                 <string>地图 / 路径规划预览</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+      </item>
+      <item>
+       <widget class="QScrollArea" name="scrollArea_right">
+        <property name="widgetResizable">
+         <bool>true</bool>
+        </property>
+        <widget class="QWidget" name="scrollAreaWidgetContents">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>0</y>
+           <width>500</width>
+           <height>1400</height>
+          </rect>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_rightpanel">
+          <item>
+           <widget class="QGroupBox" name="groupBox_input">
+            <property name="title">
+             <string>输入源与控制</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_input">
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_source">
+               <property name="text">
+                <string>输入源：</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QComboBox" name="comboBox_source">
+               <item>
+                <property name="text">
+                 <string>本地摄像头</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>网络摄像头</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>本地视频文件</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>仿真数据流</string>
+                </property>
+               </item>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_device_id">
+               <property name="text">
+                <string>设备/地址：</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QLineEdit" name="lineEdit_device">
+               <property name="placeholderText">
+                <string>0 / rtsp://... / 视频路径</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QPushButton" name="pushButton_connect">
+               <property name="text">
+                <string>连接设备</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QPushButton" name="pushButton_disconnect">
+               <property name="text">
+                <string>断开设备</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QPushButton" name="pushButton_start">
+               <property name="text">
+                <string>开始检测</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1">
+              <widget class="QPushButton" name="pushButton_stop">
+               <property name="text">
+                <string>停止检测</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0">
+              <widget class="QPushButton" name="pushButton_snapshot">
+               <property name="text">
+                <string>保存截图</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1">
+              <widget class="QPushButton" name="pushButton_record">
+               <property name="text">
+                <string>录制结果</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_model">
+            <property name="title">
+             <string>模型参数</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_model">
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_model">
+               <property name="text">
+                <string>检测模型：</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QComboBox" name="comboBox_model">
+               <item>
+                <property name="text">
+                 <string>YOLOv8n</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>YOLOv8s</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>YOLOv8m</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>自定义ONNX</string>
+                </property>
+               </item>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_weight">
+               <property name="text">
+                <string>权重路径：</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QLineEdit" name="lineEdit_weight">
+               <property name="placeholderText">
+                <string>选择模型权重文件</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_confidence">
+               <property name="text">
+                <string>置信度阈值：</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <layout class="QHBoxLayout" name="horizontalLayout_confidence">
+               <item>
+                <widget class="QSlider" name="horizontalSlider_confidence">
+                 <property name="minimum">
+                  <number>1</number>
+                 </property>
+                 <property name="maximum">
+                  <number>100</number>
+                 </property>
+                 <property name="value">
+                  <number>45</number>
+                 </property>
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="label_confidence_value">
+                 <property name="text">
+                  <string>0.45</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="3" column="0">
+              <widget class="QLabel" name="label_iou">
+               <property name="text">
+                <string>IOU 阈值：</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1">
+              <layout class="QHBoxLayout" name="horizontalLayout_iou">
+               <item>
+                <widget class="QSlider" name="horizontalSlider_iou">
+                 <property name="minimum">
+                  <number>1</number>
+                 </property>
+                 <property name="maximum">
+                  <number>100</number>
+                 </property>
+                 <property name="value">
+                  <number>50</number>
+                 </property>
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="label_iou_value">
+                 <property name="text">
+                  <string>0.50</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="4" column="0">
+              <widget class="QCheckBox" name="checkBox_gpu">
+               <property name="text">
+                <string>启用 GPU</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1">
+              <widget class="QCheckBox" name="checkBox_half">
+               <property name="text">
+                <string>半精度推理</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0">
+              <widget class="QCheckBox" name="checkBox_track">
+               <property name="text">
+                <string>启用目标跟踪</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="1">
+              <widget class="QCheckBox" name="checkBox_lane">
+               <property name="text">
+                <string>显示车道线</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_classes">
+            <property name="title">
+             <string>识别类别</string>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_classes">
+             <item>
+              <widget class="QListWidget" name="listWidget_classes">
+               <item>
+                <property name="text">
+                 <string>car</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>bus</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>truck</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>person</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>bicycle</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>motorbike</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>traffic light</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>stop sign</string>
+                </property>
+               </item>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_result_table">
+            <property name="title">
+             <string>检测结果列表</string>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_table">
+             <item>
+              <widget class="QTableWidget" name="tableWidget_results">
+               <property name="columnCount">
+                <number>6</number>
+               </property>
+               <column>
+                <property name="text">
+                 <string>ID</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>类别</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>置信度</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>位置</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>距离</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>速度</string>
+                </property>
+               </column>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_vehicle">
+            <property name="title">
+             <string>车辆状态</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_vehicle">
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_steer_title">
+               <property name="text">
+                <string>方向盘角度：</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QProgressBar" name="progressBar_steer">
+               <property name="minimum">
+                <number>-100</number>
+               </property>
+               <property name="maximum">
+                <number>100</number>
+               </property>
+               <property name="value">
+                <number>0</number>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_brake_title">
+               <property name="text">
+                <string>制动状态：</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QProgressBar" name="progressBar_brake">
+               <property name="value">
+                <number>0</number>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_battery_title">
+               <property name="text">
+                <string>电量：</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QProgressBar" name="progressBar_battery">
+               <property name="value">
+                <number>85</number>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_log">
+            <property name="title">
+             <string>系统日志</string>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_log">
+             <item>
+              <widget class="QPlainTextEdit" name="plainTextEdit_log">
+               <property name="readOnly">
+                <bool>true</bool>
+               </property>
+               <property name="plainText">
+                <string>[INFO] 系统启动完成
+[INFO] 等待连接输入源...</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <spacer name="verticalSpacer_bottom">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1600</width>
+     <height>26</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu_file">
+    <property name="title">
+     <string>文件</string>
+    </property>
+    <addaction name="action_open_video"/>
+    <addaction name="action_open_model"/>
+    <addaction name="action_export_result"/>
+    <addaction name="action_exit"/>
+   </widget>
+   <widget class="QMenu" name="menu_view">
+    <property name="title">
+     <string>视图</string>
+    </property>
+    <addaction name="action_show_toolbar"/>
+    <addaction name="action_fullscreen"/>
+   </widget>
+   <widget class="QMenu" name="menu_help">
+    <property name="title">
+     <string>帮助</string>
+    </property>
+    <addaction name="action_about"/>
+   </widget>
+   <addaction name="menu_file"/>
+   <addaction name="menu_view"/>
+   <addaction name="menu_help"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar">
+   <property name="sizeGripEnabled">
+    <bool>true</bool>
+   </property>
+  </widget>
+  <action name="action_open_video">
+   <property name="text">
+    <string>打开视频</string>
+   </property>
+  </action>
+  <action name="action_open_model">
+   <property name="text">
+    <string>加载模型</string>
+   </property>
+  </action>
+  <action name="action_export_result">
+   <property name="text">
+    <string>导出结果</string>
+   </property>
+  </action>
+  <action name="action_exit">
+   <property name="text">
+    <string>退出</string>
+   </property>
+  </action>
+  <action name="action_show_toolbar">
+   <property name="text">
+    <string>显示工具栏</string>
+   </property>
+  </action>
+  <action name="action_fullscreen">
+   <property name="text">
+    <string>全屏</string>
+   </property>
+  </action>
+  <action name="action_about">
+   <property name="text">
+    <string>关于</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
+

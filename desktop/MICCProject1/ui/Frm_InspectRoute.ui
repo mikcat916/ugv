@@ -1,0 +1,717 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Frm_InspectRoute</class>
+ <widget class="QWidget" name="Frm_InspectRoute">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1180</width>
+    <height>780</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>1160</width>
+    <height>760</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>巡检路线管理</string>
+  </property>
+  <widget class="QGroupBox" name="groupBox_2">
+   <property name="geometry">
+    <rect>
+     <x>12</x>
+     <y>56</y>
+     <width>420</width>
+     <height>300</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>10</pointsize>
+    </font>
+   </property>
+   <property name="title">
+    <string>巡检路线列表</string>
+   </property>
+   <widget class="QPushButton" name="btn_New">
+    <property name="geometry">
+     <rect>
+      <x>16</x>
+      <y>28</y>
+      <width>90</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>新建</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btn_Delete">
+    <property name="geometry">
+     <rect>
+      <x>116</x>
+      <y>28</y>
+      <width>90</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>删除</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btn_Enable">
+    <property name="geometry">
+     <rect>
+      <x>216</x>
+      <y>28</y>
+      <width>70</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>启用</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btn_Disable">
+    <property name="geometry">
+     <rect>
+      <x>296</x>
+      <y>28</y>
+      <width>70</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>禁用</string>
+    </property>
+   </widget>
+   <widget class="QTableWidget" name="tv_InspectRoute">
+    <property name="geometry">
+     <rect>
+      <x>12</x>
+      <y>68</y>
+      <width>396</width>
+      <height>220</height>
+     </rect>
+    </property>
+    <property name="selectionMode">
+     <enum>QAbstractItemView::SingleSelection</enum>
+    </property>
+    <property name="selectionBehavior">
+     <enum>QAbstractItemView::SelectRows</enum>
+    </property>
+    <property name="sortingEnabled">
+     <bool>true</bool>
+    </property>
+    <property name="columnCount">
+     <number>6</number>
+    </property>
+    <column>
+     <property name="text">
+      <string>路线ID</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>所属区域</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>路线名称</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>点位数</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>路径长度</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>状态</string>
+     </property>
+    </column>
+   </widget>
+  </widget>
+  <widget class="QGroupBox" name="gbox_status">
+   <property name="geometry">
+    <rect>
+     <x>12</x>
+     <y>368</y>
+     <width>420</width>
+     <height>340</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>10</pointsize>
+    </font>
+   </property>
+   <property name="title">
+    <string>新增巡检路线</string>
+   </property>
+   <widget class="QLabel" name="label_2">
+    <property name="geometry">
+     <rect>
+      <x>18</x>
+      <y>34</y>
+      <width>60</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>所属区域:</string>
+    </property>
+   </widget>
+   <widget class="QComboBox" name="txt_AreaId">
+    <property name="geometry">
+     <rect>
+      <x>84</x>
+      <y>34</y>
+      <width>298</width>
+      <height>26</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_15">
+    <property name="geometry">
+     <rect>
+      <x>388</x>
+      <y>38</y>
+      <width>18</width>
+      <height>18</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>9</pointsize>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">color: rgb(255, 0, 0);</string>
+    </property>
+    <property name="text">
+     <string>(*)</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label">
+    <property name="geometry">
+     <rect>
+      <x>18</x>
+      <y>72</y>
+      <width>60</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>路线名称:</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="txt_RouteName">
+    <property name="geometry">
+     <rect>
+      <x>84</x>
+      <y>72</y>
+      <width>298</width>
+      <height>26</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_13">
+    <property name="geometry">
+     <rect>
+      <x>388</x>
+      <y>76</y>
+      <width>18</width>
+      <height>18</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>9</pointsize>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">color: rgb(255, 0, 0);</string>
+    </property>
+    <property name="text">
+     <string>(*)</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_8">
+    <property name="geometry">
+     <rect>
+      <x>18</x>
+      <y>110</y>
+      <width>60</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>路线编码:</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="txt_RouteCode">
+    <property name="geometry">
+     <rect>
+      <x>84</x>
+      <y>110</y>
+      <width>298</width>
+      <height>26</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_14">
+    <property name="geometry">
+     <rect>
+      <x>388</x>
+      <y>114</y>
+      <width>18</width>
+      <height>18</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>9</pointsize>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">color: rgb(255, 0, 0);</string>
+    </property>
+    <property name="text">
+     <string>(*)</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_7">
+    <property name="geometry">
+     <rect>
+      <x>18</x>
+      <y>148</y>
+      <width>60</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>规划类型:</string>
+    </property>
+   </widget>
+   <widget class="QComboBox" name="txt_PlanType">
+    <property name="geometry">
+     <rect>
+      <x>84</x>
+      <y>148</y>
+      <width>128</width>
+      <height>26</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_12">
+    <property name="geometry">
+     <rect>
+      <x>230</x>
+      <y>148</y>
+      <width>60</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>点位数量:</string>
+    </property>
+   </widget>
+   <widget class="QSpinBox" name="txt_PointCount">
+    <property name="geometry">
+     <rect>
+      <x>294</x>
+      <y>148</y>
+      <width>88</width>
+      <height>26</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_10">
+    <property name="geometry">
+     <rect>
+      <x>18</x>
+      <y>186</y>
+      <width>60</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>预计长度:</string>
+    </property>
+   </widget>
+   <widget class="QDoubleSpinBox" name="txt_PathLength">
+    <property name="geometry">
+     <rect>
+      <x>84</x>
+      <y>186</y>
+      <width>128</width>
+      <height>26</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_11">
+    <property name="geometry">
+     <rect>
+      <x>230</x>
+      <y>186</y>
+      <width>60</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>巡检时长:</string>
+    </property>
+   </widget>
+   <widget class="QDoubleSpinBox" name="txt_InsDuration">
+    <property name="geometry">
+     <rect>
+      <x>294</x>
+      <y>186</y>
+      <width>88</width>
+      <height>26</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_9">
+    <property name="geometry">
+     <rect>
+      <x>18</x>
+      <y>224</y>
+      <width>60</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>备注:</string>
+    </property>
+   </widget>
+   <widget class="QTextEdit" name="txt_Remark">
+    <property name="geometry">
+     <rect>
+      <x>84</x>
+      <y>224</y>
+      <width>298</width>
+      <height>52</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="lab_Note">
+    <property name="geometry">
+     <rect>
+      <x>18</x>
+      <y>282</y>
+      <width>370</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QWidget" name="layoutWidget">
+    <property name="geometry">
+     <rect>
+      <x>48</x>
+      <y>306</y>
+      <width>286</width>
+      <height>28</height>
+     </rect>
+    </property>
+    <layout class="QGridLayout" name="gridLayout_2">
+     <property name="horizontalSpacing">
+      <number>12</number>
+     </property>
+     <property name="leftMargin">
+      <number>0</number>
+     </property>
+     <property name="topMargin">
+      <number>0</number>
+     </property>
+     <property name="rightMargin">
+      <number>0</number>
+     </property>
+     <property name="bottomMargin">
+      <number>0</number>
+     </property>
+     <item row="0" column="0">
+      <widget class="QPushButton" name="btn_Save">
+       <property name="text">
+        <string>保存</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QPushButton" name="btn_Clear">
+       <property name="text">
+        <string>清空</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QGroupBox" name="groupbox3">
+   <property name="geometry">
+    <rect>
+     <x>444</x>
+     <y>56</y>
+     <width>644</width>
+     <height>300</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>10</pointsize>
+    </font>
+   </property>
+   <property name="title">
+    <string>关联巡检点位</string>
+   </property>
+   <widget class="QLabel" name="lab_selectedArea">
+    <property name="geometry">
+     <rect>
+      <x>16</x>
+      <y>30</y>
+      <width>220</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>当前区域：未选择</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="lab_selectedRoute">
+    <property name="geometry">
+     <rect>
+      <x>368</x>
+      <y>30</y>
+      <width>260</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>当前路线：未选择</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_5">
+    <property name="geometry">
+     <rect>
+      <x>16</x>
+      <y>54</y>
+      <width>210</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>当前区域全部点位</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_6">
+    <property name="geometry">
+     <rect>
+      <x>368</x>
+      <y>54</y>
+      <width>260</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>已关联点位（双击编辑停留/角度）</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QTableWidget" name="tv_InspectPoint1">
+    <property name="geometry">
+     <rect>
+      <x>16</x>
+      <y>78</y>
+      <width>198</width>
+      <height>208</height>
+     </rect>
+    </property>
+    <property name="selectionMode">
+     <enum>QAbstractItemView::SingleSelection</enum>
+    </property>
+    <property name="selectionBehavior">
+     <enum>QAbstractItemView::SelectRows</enum>
+    </property>
+    <property name="sortingEnabled">
+     <bool>true</bool>
+    </property>
+    <property name="columnCount">
+     <number>3</number>
+    </property>
+    <column>
+     <property name="text">
+      <string>点位ID</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>点位名称</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>经纬度</string>
+     </property>
+    </column>
+   </widget>
+   <widget class="QWidget" name="layoutWidget1">
+    <property name="geometry">
+     <rect>
+      <x>226</x>
+      <y>102</y>
+      <width>130</width>
+      <height>150</height>
+     </rect>
+    </property>
+    <layout class="QGridLayout" name="gridLayout_3">
+     <property name="verticalSpacing">
+      <number>10</number>
+     </property>
+     <property name="leftMargin">
+      <number>0</number>
+     </property>
+     <property name="topMargin">
+      <number>0</number>
+     </property>
+     <property name="rightMargin">
+      <number>0</number>
+     </property>
+     <property name="bottomMargin">
+      <number>0</number>
+     </property>
+     <item row="0" column="0">
+      <widget class="QPushButton" name="btn_Add">
+       <property name="text">
+        <string>添加到路线 &gt;</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QPushButton" name="btn_Remove">
+       <property name="text">
+        <string>&lt; 移除点位</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="0">
+      <widget class="QPushButton" name="btn_Up">
+       <property name="text">
+        <string>上移</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="0">
+      <widget class="QPushButton" name="btn_Down">
+       <property name="text">
+        <string>下移</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="0">
+      <widget class="QPushButton" name="btn_SaveRelation">
+       <property name="text">
+        <string>保存关联</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+   <widget class="QTableWidget" name="tv_InspectPoint2">
+    <property name="geometry">
+     <rect>
+      <x>368</x>
+      <y>78</y>
+      <width>260</width>
+      <height>208</height>
+     </rect>
+    </property>
+    <property name="selectionMode">
+     <enum>QAbstractItemView::SingleSelection</enum>
+    </property>
+    <property name="selectionBehavior">
+     <enum>QAbstractItemView::SelectRows</enum>
+    </property>
+    <property name="sortingEnabled">
+     <bool>true</bool>
+    </property>
+    <property name="columnCount">
+     <number>6</number>
+    </property>
+    <column>
+     <property name="text">
+      <string>点位ID</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>点位名称</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>经纬度</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>停留(秒)</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>角度</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>顺序</string>
+     </property>
+    </column>
+   </widget>
+  </widget>
+  <widget class="QGroupBox" name="gbox_map">
+   <property name="geometry">
+    <rect>
+     <x>444</x>
+     <y>368</y>
+     <width>644</width>
+     <height>340</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>10</pointsize>
+    </font>
+   </property>
+   <property name="title">
+    <string>路线预览</string>
+   </property>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

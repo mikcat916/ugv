@@ -1,0 +1,106 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ComputingDialog</class>
+ <widget class="QDialog" name="ComputingDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>540</width>
+    <height>760</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>500</width>
+    <height>620</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>算力信息</string>
+  </property>
+  <property name="modal">
+   <bool>true</bool>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="spacing"><number>16</number></property>
+   <property name="leftMargin"><number>24</number></property>
+   <property name="topMargin"><number>24</number></property>
+   <property name="rightMargin"><number>24</number></property>
+   <property name="bottomMargin"><number>24</number></property>
+   <item>
+    <widget class="QLabel" name="titleLabel">
+     <property name="text"><string>算力信息</string></property>
+     <property name="objectName"><string notr="true">titleLabel</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="deviceGroup">
+     <property name="title"><string>关联设备</string></property>
+     <layout class="QFormLayout" name="deviceFormLayout">
+      <property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property>
+      <property name="verticalSpacing"><number>12</number></property>
+      <item row="0" column="0"><widget class="QLabel" name="labelDevice"><property name="text"><string>选择设备 *</string></property></widget></item>
+      <item row="0" column="1"><widget class="QComboBox" name="deviceCombo"/></item>
+      <item row="1" column="0"><widget class="QLabel" name="labelTimestamp"><property name="text"><string>记录时间</string></property></widget></item>
+      <item row="1" column="1"><widget class="QDateTimeEdit" name="timestampEdit"><property name="calendarPopup"><bool>true</bool></property><property name="displayFormat"><string>yyyy-MM-dd HH:mm:ss</string></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="cpuGroup">
+     <property name="title"><string>CPU信息</string></property>
+     <layout class="QFormLayout" name="cpuFormLayout">
+      <property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property>
+      <property name="verticalSpacing"><number>12</number></property>
+      <item row="0" column="0"><widget class="QLabel" name="labelCpuUsage"><property name="text"><string>CPU使用率</string></property></widget></item>
+      <item row="0" column="1"><widget class="QDoubleSpinBox" name="cpuUsageSpin"><property name="decimals"><number>2</number></property><property name="maximum"><double>100.000000000000000</double></property><property name="suffix"><string> %</string></property></widget></item>
+      <item row="1" column="0"><widget class="QLabel" name="labelCpuCoreUsage"><property name="text"><string>各核使用率</string></property></widget></item>
+      <item row="1" column="1"><widget class="QLineEdit" name="cpuCoreUsageEdit"><property name="placeholderText"><string>[10.5, 20.3, 15.0, ...]</string></property></widget></item>
+      <item row="2" column="0"><widget class="QLabel" name="labelCpuCoreFreq"><property name="text"><string>各核频率</string></property></widget></item>
+      <item row="2" column="1"><widget class="QLineEdit" name="cpuCoreFreqEdit"><property name="placeholderText"><string>[0.9, 1.7, 2.0, ...] MHz</string></property></widget></item>
+      <item row="3" column="0"><widget class="QLabel" name="labelCpuTemp"><property name="text"><string>CPU温度</string></property></widget></item>
+      <item row="3" column="1"><widget class="QDoubleSpinBox" name="cpuTempSpin"><property name="decimals"><number>1</number></property><property name="maximum"><double>150.000000000000000</double></property><property name="suffix"><string> ℃</string></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="gpuGroup">
+     <property name="title"><string>GPU信息</string></property>
+     <layout class="QFormLayout" name="gpuFormLayout">
+      <property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property>
+      <property name="verticalSpacing"><number>12</number></property>
+      <item row="0" column="0"><widget class="QLabel" name="labelGpuUsage"><property name="text"><string>GPU使用率</string></property></widget></item>
+      <item row="0" column="1"><widget class="QDoubleSpinBox" name="gpuUsageSpin"><property name="decimals"><number>2</number></property><property name="maximum"><double>100.000000000000000</double></property><property name="suffix"><string> %</string></property></widget></item>
+      <item row="1" column="0"><widget class="QLabel" name="labelGpuTemp"><property name="text"><string>GPU温度</string></property></widget></item>
+      <item row="1" column="1"><widget class="QDoubleSpinBox" name="gpuTempSpin"><property name="decimals"><number>1</number></property><property name="maximum"><double>150.000000000000000</double></property><property name="suffix"><string> ℃</string></property></widget></item>
+      <item row="2" column="0"><widget class="QLabel" name="labelGpuFreq"><property name="text"><string>GPU频率</string></property></widget></item>
+      <item row="2" column="1"><widget class="QDoubleSpinBox" name="gpuFreqSpin"><property name="decimals"><number>0</number></property><property name="maximum"><double>9999.000000000000000</double></property><property name="suffix"><string> MHz</string></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
+    </spacer>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="buttonLayout">
+     <item><spacer name="horizontalSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QPushButton" name="cancelBtn"><property name="text"><string>取消</string></property><property name="minimumSize"><size><width>80</width><height>36</height></size></property></widget></item>
+     <item><widget class="QPushButton" name="saveBtn"><property name="text"><string>保存</string></property><property name="minimumSize"><size><width>80</width><height>36</height></size></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>cancelBtn</sender>
+   <signal>clicked()</signal>
+   <receiver>ComputingDialog</receiver>
+   <slot>reject()</slot>
+  </connection>
+ </connections>
+</ui>

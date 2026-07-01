@@ -1,0 +1,721 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1197</width>
+    <height>792</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">
+
+/* 2) TabWidget 作为“卡片容器” */
+QTabWidget#tabWidget{
+    background: transparent;   /* 外层透明，让我们用 pane 画卡片 */
+}
+
+/* 3) 关键：pane 才是 tabWidget 的主体区域（画圆角卡片） */
+QTabWidget#tabWidget::pane{
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
+        stop:0 #dff2ff,
+        stop:1 #ffffff);
+    border: 1px solid rgba(0,0,0,25);
+    border-radius: 14px;
+    top: -1px;                 /* 让 tab 不把圆角顶掉，可微调 */
+}
+
+/* 4) 关键：每个 tab page 默认是白底，必须设透明！否则就会“露白” */
+QTabWidget#tabWidget QWidget{
+    background: transparent;
+}
+
+/* 5) Tab 样式（可选，做得更像左图） */
+QTabBar::tab{
+    background: transparent;
+    padding: 6px 14px;
+    margin-left: 6px;
+    color: rgba(0,0,0,180);
+    border: 0px;
+}
+
+QTabBar::tab:selected{
+    color: #0b4aa8;
+    font-weight: 600;
+}
+
+QTabBar::tab:selected{
+    border-bottom: 2px solid #0b4aa8;  /* 选中下划线 */
+}
+
+/* 6) 如果你的两个 page 里还有其它 widget 想要白底，就在 page 内部再单独设 */
+</string>
+  </property>
+  <widget class="QWidget" name="rootWrap" native="true">
+   <property name="geometry">
+    <rect>
+     <x>110</x>
+     <y>110</y>
+     <width>961</width>
+     <height>601</height>
+    </rect>
+   </property>
+   <property name="autoFillBackground">
+    <bool>false</bool>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">QWidget#rootWrap{
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:1 #F6FBFF,
+        stop:0 #E8F2FF
+    );
+    border: 1px solid rgba(0,0,0,20);
+    border-radius: 18px;
+}
+
+</string>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout_5">
+    <property name="leftMargin">
+     <number>20</number>
+    </property>
+    <property name="topMargin">
+     <number>20</number>
+    </property>
+    <property name="rightMargin">
+     <number>20</number>
+    </property>
+    <property name="bottomMargin">
+     <number>20</number>
+    </property>
+    <item>
+     <widget class="QWidget" name="topBar" native="true">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>56</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>56</height>
+       </size>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <property name="spacing">
+        <number>6</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QPushButton" name="btnpic">
+         <property name="minimumSize">
+          <size>
+           <width>52</width>
+           <height>52</height>
+          </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">border-image: url(assets/app.ico);
+
+</string>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btnMin">
+         <property name="styleSheet">
+          <string notr="true">QPushButton#btnMin{
+    background: transparent;
+    border: none;
+    padding: 6px;              /* 图标与边缘距离 */
+}
+QPushButton#btnMin:hover{
+    background: rgba(0,0,0,20);  /* 浅灰 hover */
+    border-radius: 8px;
+}
+QPushButton#btnMin:pressed{
+    background: rgba(0,0,0,35);
+}
+</string>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="icon">
+          <iconset>
+           <normaloff>../../res/缩小.png</normaloff>../../res/缩小.png</iconset>
+         </property>
+         <property name="iconSize">
+          <size>
+           <width>24</width>
+           <height>24</height>
+          </size>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btnExit">
+         <property name="styleSheet">
+          <string notr="true">QPushButton#btnExit{
+    background: transparent;
+    border: none;
+    padding: 6px;
+}
+QPushButton#btnExit:hover{
+    background: rgba(0,0,0,20);  /* 浅灰 hover */
+    border-radius: 8px;
+}
+QPushButton#btnExit:pressed{
+    background: rgba(0,0,0,35);
+}
+</string>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="icon">
+          <iconset>
+           <normaloff>../../res/离开建筑物.png</normaloff>../../res/离开建筑物.png</iconset>
+         </property>
+         <property name="iconSize">
+          <size>
+           <width>32</width>
+           <height>32</height>
+          </size>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="tab">
+       <attribute name="title">
+        <string>Tab 1</string>
+       </attribute>
+       <layout class="QHBoxLayout" name="horizontalLayout">
+        <item>
+         <widget class="QWidget" name="modulesWrap" native="true">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="2,2,2,2">
+           <property name="spacing">
+            <number>24</number>
+           </property>
+           <property name="leftMargin">
+            <number>24</number>
+           </property>
+           <property name="topMargin">
+            <number>24</number>
+           </property>
+           <property name="rightMargin">
+            <number>16</number>
+           </property>
+           <property name="bottomMargin">
+            <number>16</number>
+           </property>
+           <item>
+            <widget class="QWidget" name="col1" native="true">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayout">
+              <property name="spacing">
+               <number>16</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="QPushButton" name="imgpush">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>96</height>
+                 </size>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">
+
+QPushButton#imgpush{
+    border: 1px solid rgba(0,0,0,25);
+    border-radius: 18px;
+
+    /* 用背景图（比 border-image 更稳定，圆角一定生效） */
+    border-image: url(assets/control2.png);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: rgba(255,255,255,10);
+    /* Fluent 字体风格 */
+    color: white;
+    font-size: 18px;          /* 想更大就 20/22 */
+    font-weight: 600;
+    padding: 10px 14px;
+
+    /* 文字居中 */
+    text-align: center;
+}
+
+/* hover：更亮一点 + 边框更明显 */
+QPushButton#imgpush:hover{
+    border: 1px solid rgba(255,255,255,160);
+}
+
+/* pressed：轻微“下沉” */
+QPushButton#imgpush:pressed{
+    padding-top: 12px;     /* 比原来+2px */
+    padding-left: 15px;
+    border: 1px solid rgba(0,0,0,40);
+}
+
+
+</string>
+                </property>
+                <property name="text">
+                 <string>设备基本控制</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="imgpush2">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>96</height>
+                 </size>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">
+
+
+
+QPushButton#imgpush2{
+    border: 1px solid rgba(0,0,0,25);
+    border-radius: 18px;
+
+    /* 用背景图（比 border-image 更稳定，圆角一定生效） */
+    border-image: url(assets/zhuangtai2.png);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: rgba(255,255,255,10);
+    /* Fluent 字体风格 */
+    color: white;
+    font-size: 18px;          /* 想更大就 20/22 */
+    font-weight: 600;
+    padding: 10px 14px;
+
+    /* 文字居中 */
+    text-align: center;
+}
+
+/* hover：更亮一点 + 边框更明显 */
+QPushButton#imgpush2:hover{
+    border: 1px solid rgba(255,255,255,160);
+}
+
+/* pressed：轻微“下沉” */
+QPushButton#imgpush2:pressed{
+    padding-top: 12px;
+    padding-left: 15px;
+    border: 1px solid rgba(0,0,0,40);
+}
+
+
+</string>
+                </property>
+                <property name="text">
+                 <string>设备状态监控</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QWidget" name="col2" native="true">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayout_2">
+              <property name="spacing">
+               <number>16</number>
+              </property>
+              <item>
+               <widget class="QPushButton" name="imgpush3">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>100</height>
+                 </size>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">
+
+
+
+
+
+QPushButton#imgpush3{
+    border: 1px solid rgba(0,0,0,25);
+    border-radius: 18px;
+
+    /* 用背景图（比 border-image 更稳定，圆角一定生效） */
+    border-image: url(assets/renwu2.png);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: rgba(255,255,255,10);
+    /* Fluent 字体风格 */
+    color: white;
+    font-size: 18px;          /* 想更大就 20/22 */
+    font-weight: 600;
+    padding: 10px 14px;
+
+    /* 文字居中 */
+    text-align: center;
+}
+
+/* hover：更亮一点 + 边框更明显 */
+QPushButton#imgpush3:hover{
+    border: 1px solid rgba(255,255,255,160);
+}
+
+/* pressed：轻微“下沉” */
+QPushButton#imgpush3:pressed{
+    padding-top: 12px;
+    padding-left: 15px;
+    border: 1px solid rgba(0,0,0,40);
+}
+
+
+</string>
+                </property>
+                <property name="text">
+                 <string>任务执行管理</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QWidget" name="col3" native="true">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayout_3">
+              <property name="spacing">
+               <number>0</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="QPushButton" name="imgpush4">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>96</height>
+                 </size>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">
+
+QPushButton#imgpush4{
+    border: 1px solid rgba(0,0,0,25);
+    border-radius: 18px;
+
+    /* 用背景图（比 border-image 更稳定，圆角一定生效） */
+    border-image: url(assets/chuangan2.png);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: rgba(255,255,255,10);
+    /* Fluent 字体风格 */
+    color: white;
+    font-size: 18px;          /* 想更大就 20/22 */
+    font-weight: 600;
+    padding: 10px 14px;
+
+    /* 文字居中 */
+    text-align: center;
+}
+
+/* hover：更亮一点 + 边框更明显 */
+QPushButton#imgpush4:hover{
+    border: 1px solid rgba(255,255,255,160);
+}
+
+/* pressed：轻微“下沉” */
+QPushButton#imgpush4:pressed{
+    padding-top: 12px;
+    padding-left: 15px;
+    border: 1px solid rgba(0,0,0,40);
+}
+
+
+</string>
+                </property>
+                <property name="text">
+                 <string>传感数据管理</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="imgpush5">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>96</height>
+                 </size>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">
+
+
+
+
+
+QPushButton#imgpush5{
+    border: 1px solid rgba(0,0,0,25);
+    border-radius: 18px;
+
+    /* 用背景图（比 border-image 更稳定，圆角一定生效） */
+    border-image: url(assets/tongxin2.png);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: rgba(255,255,255,10);
+    /* Fluent 字体风格 */
+    color: white;
+    font-size: 18px;          /* 想更大就 20/22 */
+    font-weight: 600;
+    padding: 10px 14px;
+
+    /* 文字居中 */
+    text-align: center;
+}
+
+/* hover：更亮一点 + 边框更明显 */
+QPushButton#imgpush5:hover{
+    border: 1px solid rgba(255,255,255,160);
+}
+
+/* pressed：轻微“下沉” */
+QPushButton#imgpush5:pressed{
+    padding-top: 12px;
+    padding-left: 15px;
+    border: 1px solid rgba(0,0,0,40);
+}
+
+
+</string>
+                </property>
+                <property name="text">
+                 <string>集群组队通信</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QWidget" name="col4" native="true">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayout_4">
+              <property name="spacing">
+               <number>16</number>
+              </property>
+              <item>
+               <widget class="QPushButton" name="imgpush6">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>100</height>
+                 </size>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">
+
+
+
+
+
+
+
+QPushButton#imgpush6{
+    border: 1px solid rgba(0,0,0,25);
+    border-radius: 18px;
+
+    /* 用背景图（比 border-image 更稳定，圆角一定生效） */
+    border-image: url(assets/zonghe2.png);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: rgba(255,255,255,10);
+    /* Fluent 字体风格 */
+    color: white;
+    font-size: 18px;          /* 想更大就 20/22 */
+    font-weight: 600;
+    padding: 10px 14px;
+
+    /* 文字居中 */
+    text-align: center;
+}
+
+/* hover：更亮一点 + 边框更明显 */
+QPushButton#imgpush6:hover{
+    border: 1px solid rgba(255,255,255,160);
+}
+
+/* pressed：轻微“下沉” */
+QPushButton#imgpush6:pressed{
+    padding-top: 12px;
+    padding-left: 15px;
+    border: 1px solid rgba(0,0,0,40);
+}
+
+
+</string>
+                </property>
+                <property name="text">
+                 <string>设备综合管理</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tab_2">
+       <attribute name="title">
+        <string>Tab 2</string>
+       </attribute>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources>
+  <include location="../../res/2.qrc"/>
+ </resources>
+ <connections/>
+</ui>

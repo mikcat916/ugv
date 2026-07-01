@@ -1,0 +1,6 @@
+# Root dependency entrypoint for the Project4 repository.
+# Install backend or desktop dependencies explicitly as needed:
+#   pip install -r backend/requirements.txt
+#   pip install -r desktop/requirements.txt
+
+-r backend/requirements.txt

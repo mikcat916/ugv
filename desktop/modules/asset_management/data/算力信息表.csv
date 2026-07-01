@@ -1,0 +1,11 @@
+﻿字段名称,字段CODE,字段类型(长度),示例,说明
+记录ID,CPId,int,,主键
+无人车ID,UGVId,int,,关联的设备ID
+CPU瞬时使用率,CPUUsage,float,,CPU各核的平均使用率0-100%
+CPU各核使用率,CPUCoreUsage,varchar(200),"[10.5, 20.3,...]",CPU各核的使用率，使用数组存储，0-100%
+CPU各核频率,CPUCoreFreq,varchar(200),"[0.9, 1.7]",CPU各核的频率，使用数组存储(MHz)
+CPU温度,CPUTemp,float,,℃
+GPU瞬时使用率,GPUUsage,float,,%
+GPU温度,GPUTemp,float,,℃
+GPU频率,GPUFreq,float,,MHz
+记录时间戳,TimeStamp,datetime,,

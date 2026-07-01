@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title }} | 机器人巡检平台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/dashboard.css?v={{ asset_version }}">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主内容</a>
+  <div class="app-shell">
+    <aside class="shell-nav">
+      <div class="brand">
+        <div class="brand-mark">巡</div>
+        <div>
+          <div class="brand-title">{{ site.name }}</div>
+          <div class="brand-subtitle">{{ site.subtitle }}</div>
+        </div>
+      </div>
+      <button class="nav-toggle secondary-button" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links">
+        展开导航
+      </button>
+
+      <nav class="nav-links" id="nav-links">
+        {% set nav_groups = [
+          ("总览", ["overview"]),
+          ("设备与机器人", ["status", "video", "perception", "sensors", "maps", "control", "device_management", "devices"])
+        ] %}
+        {% for group_title, group_keys in nav_groups %}
+        {% set group = namespace(has_visible=false) %}
+        {% for key in group_keys %}
+        {% if key in pages and (key != "devices" or page_id == "devices") %}
+        {% set group.has_visible = true %}
+        {% endif %}
+        {% endfor %}
+        {% if group.has_visible %}
+        <section class="nav-group" aria-label="{{ group_title }}">
+          <p class="nav-group-title">{{ group_title }}</p>
+          {% for key in group_keys %}
+          {% if key in pages and (key != "devices" or page_id == "devices") %}
+          {% set page = pages[key] %}
+          <a href="{{ page.route }}" class="{% if key == page_id %}active{% endif %}" data-page-link="{{ key }}">
+            <span>{% if key == "devices" %}旧设备页{% else %}{{ page.title }}{% endif %}</span>
+            <small>{{ page.kicker }}</small>
+          </a>
+          {% endif %}
+          {% endfor %}
+        </section>
+        {% endif %}
+        {% endfor %}
+      </nav>
+
+      <section class="nav-panel">
+        <p class="panel-kicker">系统状态</p>
+        <strong id="system-location">{{ site.city }}</strong>
+        <p class="muted">{% if mysql_ready %}数据库在线{% else %}数据库未配置{% endif %}</p>
+      </section>
+    </aside>
+
+    <main class="shell-main" id="main-content" tabindex="-1">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">{{ page_kicker }}</p>
+          <h1>{{ page_title }}</h1>
+        </div>
+        <div class="topbar-actions">
+          <div class="user-chip">
+            <span>{{ current_user.display_name or current_user.username }}</span>
+            <small>{{ current_user.username }}</small>
+          </div>
+          <button id="logout-button" class="secondary-button" type="button">退出登录</button>
+        </div>
+      </header>
+
+      <section class="hero-strip">
+        <div>
+          <p class="eyebrow">巡检平台</p>
+          <strong id="site-name">{{ site.name }}</strong>
+          <p class="muted" id="current-location">{{ site.city }}</p>
+          <p class="muted" id="generated-at" aria-live="polite">等待数据加载</p>
+        </div>
+        <div class="hero-meta">
+          <span class="meta-pill" id="hero-location">{{ site.city }}</span>
+          <span class="meta-pill" id="mysql-status" aria-live="polite">{% if mysql_ready %}已连接{% else %}未连接数据库{% endif %}</span>
+          <span class="meta-pill" id="gps-status" aria-live="polite">定位中</span>
+          <span class="meta-pill" id="clock-pill">--:--:--</span>
+        </div>
+      </section>
+
+      <div id="page-content" class="page-content"></div>
+    </main>
+  </div>
+
+  <dialog id="crud-modal" class="crud-modal" aria-labelledby="crud-modal-title">
+    <form id="crud-modal-form" method="dialog" class="stack-form">
+      <div class="modal-header">
+        <strong id="crud-modal-title">编辑</strong>
+        <button class="ghost-button" value="cancel" type="submit" formnovalidate aria-label="关闭弹窗" style="padding:6px 10px">✕</button>
+      </div>
+      <div id="crud-modal-body" class="grid-form"></div>
+      <div class="button-row">
+        <button class="primary-button" id="crud-modal-save" type="button">保存</button>
+        <button class="secondary-button" value="cancel" type="submit" formnovalidate>取消</button>
+      </div>
+      <p class="form-error" id="crud-modal-error" role="alert" aria-live="polite"></p>
+    </form>
+  </dialog>
+
+  <script>
+    window.APP_CONFIG = {
+      pageId: {{ page_id|tojson }},
+      pageRoute: {{ page_route|tojson }},
+      amapKey: {{ amap_key|tojson }},
+      currentUser: {{ current_user|tojson }},
+      pages: {{ pages|tojson }},
+      mysqlReady: {{ mysql_ready|tojson }},
+      video: {{ video_config|tojson }},
+      vnc: {{ vnc_config|tojson }},
+      robotControl: {{ robot_control_config|tojson }}
+    };
+  </script>
+  {{ amap_script|safe }}
+  <script src="/static/dashboard.js?v={{ asset_version }}" defer></script>
+</body>
+</html>

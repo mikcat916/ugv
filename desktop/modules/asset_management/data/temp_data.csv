@@ -1,0 +1,11 @@
+﻿字段名称,字段CODE,字段类型（长度）,示例,说明
+无人车ID,UGVId,int,1,自增主键
+无人车编号,UGVCode,varchar(32),U01-XX-YY,唯一
+无人车名称,UGVName,varchar(64),,用户自定义
+无人车图片,UGVImage,varchar(255),,本地路径或 URL
+无人车型号,UGVModel,varchar(255),四驱轮式无人车,
+使用密码,UsePwd,varchar(64),,建议加密存储
+管理密码,MagPwd,varchar(64),,建议加密存储
+定位方式,Positioning,varchar(32),,如 GPS / 北斗 / 激光 SLAM
+车载传感器,SensorList,varchar(500),"1,8,19",（逗号分隔 sensor_id）
+电池容量,BatteryCap,float,29.3,（kWh）
