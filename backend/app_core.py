@@ -119,7 +119,7 @@ CONTROL_COMMAND_SUCCESS_STATUS = robot_control_helpers.CONTROL_COMMAND_SUCCESS_S
 CONTROL_COMMAND_FAILED_STATUS = robot_control_helpers.CONTROL_COMMAND_FAILED_STATUS
 ROBOT_CONTROL_MODE = os.getenv("ROBOT_CONTROL_MODE", "direct").strip().lower() or "direct"
 AUTOPILOT_RUNTIME = autopilot_helpers.AutopilotRuntime(
-    lidar_timeout_seconds=float(os.getenv("AUTOPILOT_LIDAR_TIMEOUT_SECONDS", "10") or "10"),
+    lidar_timeout_seconds=float(os.getenv("AUTOPILOT_LIDAR_TIMEOUT_SECONDS", "2") or "2"),
     control_timeout_seconds=float(os.getenv("AUTOPILOT_CONTROL_TIMEOUT_SECONDS", "10") or "10"),
 )
 AUTOPILOT_MODES = autopilot_helpers.AUTOPILOT_MODES
@@ -484,6 +484,11 @@ def to_iso_datetime(value: Any) -> str:
 def record_autonomy_event(event: dict[str, Any]) -> int | None:
     if not mysql_ready():
         return None
+    robot_id = event.get("robotId")
+    try:
+        robot_id_value = int(robot_id) if robot_id else None
+    except (TypeError, ValueError):
+        robot_id_value = None
     return execute_insert(
         """
         INSERT INTO autonomy_events
@@ -491,7 +496,7 @@ def record_autonomy_event(event: dict[str, Any]) -> int | None:
         VALUES (%s, %s, %s, %s, %s, %s)
         """,
         (
-            int(event.get("robotId") or 0),
+            robot_id_value,
             str(event.get("level") or "info")[:20],
             str(event.get("eventType") or "event")[:64],
             str(event.get("message") or ""),

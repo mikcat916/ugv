@@ -228,7 +228,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--token", default=os.getenv("PROJECT4_AUTOPILOT_TOKEN", ""), help="Device token for /api/iot/autopilot/status reports.")
     parser.add_argument("--robot-id", type=int, default=int(os.getenv("PROJECT4_AUTOPILOT_ROBOT_ID", "0") or "0"), help="Robot ID to include in reports.")
     parser.add_argument("--obstacle-topic", default="/autopilot/obstacle_status", help="Obstacle JSON topic.")
-    parser.add_argument("--cmd-topic", default="/cmd_vel", help="Velocity command topic.")
+    parser.add_argument("--cmd-topic", default="/autopilot/cmd_vel_raw", help="Raw velocity command topic for safety supervision.")
     parser.add_argument("--rate", type=float, default=10.0, help="Main loop frequency.")
     return parser.parse_args()
 

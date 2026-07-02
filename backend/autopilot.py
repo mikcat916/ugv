@@ -33,7 +33,7 @@ def _round_or_none(value: Any, digits: int = 3) -> float | None:
 class AutopilotRuntime:
     """Small in-process autopilot state machine shared by API routes."""
 
-    def __init__(self, lidar_timeout_seconds: float = 10.0, control_timeout_seconds: float = 10.0) -> None:
+    def __init__(self, lidar_timeout_seconds: float = 2.0, control_timeout_seconds: float = 10.0) -> None:
         self.lidar_timeout_seconds = float(lidar_timeout_seconds)
         self.control_timeout_seconds = float(control_timeout_seconds)
         self._lock = RLock()
@@ -285,12 +285,15 @@ class AutopilotRuntime:
             lidar["updatedAt"] = _now_iso()
         elif payload.get("updatedAt") is None:
             lidar["online"] = False
+            lidar["_lastSeenMonotonic"] = None
 
     def _derive_auto_mode_locked(self) -> None:
         if self._state.get("estop"):
             self._state["mode"] = "estop"
             self._state["safe"] = False
             self._state["reason"] = "user_estop"
+            self._state["linearX"] = 0.0
+            self._state["angularZ"] = 0.0
             return
         if not self._state.get("requestedAuto"):
             return
@@ -308,12 +311,16 @@ class AutopilotRuntime:
             self._state["reason"] = "front_clear"
             self._active_faults.discard("lidar_timeout")
             self._active_faults.discard("front_blocked")
-        elif not lidar_ok and self._state.get("mode") == "auto_running":
-            self._state["safe"] = False
-            reason = self._unsafe_reason_locked("front_blocked")
-            self._state["reason"] = reason
-            if reason in {"front_blocked", "both_front_blocked"}:
-                self._record_fault_once_locked("front_blocked", "warning", "front_obstacle_too_close", "前方障碍物过近")
+            return
+        self._state["safe"] = False
+        self._state["linearX"] = 0.0
+        self._state["angularZ"] = 0.0
+        reason = self._unsafe_reason_locked("front_blocked" if self._lidar_fresh_locked() else "lidar_timeout")
+        self._state["reason"] = reason
+        if self._state.get("mode") == "auto_running":
+            self._state["mode"] = "paused" if reason in {"front_blocked", "both_front_blocked"} else "fault"
+        if reason in {"front_blocked", "both_front_blocked"}:
+            self._record_fault_once_locked("front_blocked", "warning", "front_obstacle_too_close", "前方障碍物过近")
 
     def _apply_timeouts_locked(self) -> None:
         now = time.monotonic()
@@ -331,6 +338,8 @@ class AutopilotRuntime:
             self._state["mode"] = "estop"
             self._state["safe"] = False
             self._state["reason"] = "user_estop"
+            self._state["linearX"] = 0.0
+            self._state["angularZ"] = 0.0
             return
 
         auto_active = self._state.get("mode") in {"auto_ready", "auto_running", "fault"} or self._state.get("requestedAuto")
@@ -356,8 +365,7 @@ class AutopilotRuntime:
 
     def _lidar_ready_locked(self) -> bool:
         lidar = self._state["lidar"]
-        last_lidar = lidar.get("_lastSeenMonotonic")
-        if last_lidar is None or time.monotonic() - float(last_lidar) > self.lidar_timeout_seconds:
+        if not self._lidar_fresh_locked():
             return False
         front = _finite_float(lidar.get("frontMin"))
         if front is None or front < 0.5:
@@ -365,14 +373,21 @@ class AutopilotRuntime:
         status = str(lidar.get("obstacleStatus") or "").strip()
         return status not in STOP_REASONS
 
+    def _lidar_fresh_locked(self) -> bool:
+        lidar = self._state["lidar"]
+        last_lidar = lidar.get("_lastSeenMonotonic")
+        if last_lidar is None or time.monotonic() - float(last_lidar) > self.lidar_timeout_seconds:
+            return False
+        return True
+
     def _unsafe_reason_locked(self, fallback: str) -> str:
         lidar = self._state["lidar"]
-        status = str(lidar.get("obstacleStatus") or "").strip()
-        if status and status != "unknown":
-            return status
         front = _finite_float(lidar.get("frontMin"))
         if front is not None and front < 0.5:
             return "front_blocked"
+        status = str(lidar.get("obstacleStatus") or "").strip()
+        if status in STOP_REASONS:
+            return status
         return fallback
 
     def _snapshot_locked(self) -> dict[str, Any]:

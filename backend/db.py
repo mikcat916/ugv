@@ -200,7 +200,7 @@ def ensure_autonomy_tables() -> None:
                 """
                 CREATE TABLE IF NOT EXISTS autonomy_events (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-                    robot_id BIGINT NOT NULL,
+                    robot_id BIGINT NULL,
                     level VARCHAR(20) NOT NULL,
                     event_type VARCHAR(64) NOT NULL,
                     message TEXT,
@@ -209,6 +209,10 @@ def ensure_autonomy_tables() -> None:
                 )
                 """
             )
+            cursor.execute("SHOW COLUMNS FROM autonomy_events LIKE 'robot_id'")
+            column = cursor.fetchone()
+            if column and str(column.get("Null", "")).upper() == "NO":
+                cursor.execute("ALTER TABLE autonomy_events MODIFY robot_id BIGINT NULL")
             cursor.execute("SHOW INDEX FROM autonomy_events WHERE Key_name = 'idx_autonomy_events_robot_time'")
             if not cursor.fetchone():
                 cursor.execute(

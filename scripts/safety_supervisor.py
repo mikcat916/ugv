@@ -33,6 +33,14 @@ def clamp(value: Any, limit: float) -> float:
     return max(-abs(limit), min(abs(limit), parsed))
 
 
+def finite_float(value: Any) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return parsed if math.isfinite(parsed) else None
+
+
 def obstacle_is_safe(status: dict[str, Any], now: float | None = None, lidar_timeout: float = DEFAULT_LIDAR_TIMEOUT_SECONDS) -> SafetyDecision:
     current = time.time() if now is None else float(now)
     obstacle_status = str(status.get("obstacleStatus") or status.get("obstacle_status") or "").strip()
@@ -51,6 +59,9 @@ def obstacle_is_safe(status: dict[str, Any], now: float | None = None, lidar_tim
         return SafetyDecision(False, "lidar_timeout")
     if obstacle_status in STOP_REASONS:
         return SafetyDecision(False, obstacle_status)
+    front_min = finite_float(status.get("frontMin", status.get("front_min")))
+    if front_min is None or front_min < 0.5:
+        return SafetyDecision(False, "front_blocked")
     return SafetyDecision(
         True,
         obstacle_status or "front_clear",
@@ -87,6 +98,15 @@ class SafetySupervisor:
 
     def mark_control_command(self) -> None:
         self.last_control_at = time.time()
+
+    def on_raw_cmd(self, msg: Any) -> None:
+        self.mark_control_command()
+        decision = self.evaluate()
+        if decision.safe:
+            self.last_reason = decision.reason
+            self.publisher.publish(msg)
+            return
+        self.publish_stop(decision.reason)
 
     def stop_twist(self) -> Any:
         twist = self.twist_factory()
@@ -125,11 +145,13 @@ def main() -> None:
 
     rospy.init_node("project4_safety_supervisor", anonymous=False)
     cmd_topic = rospy.get_param("~cmd_topic", "/cmd_vel")
+    raw_cmd_topic = rospy.get_param("~raw_cmd_topic", "/autopilot/cmd_vel_raw")
     obstacle_topic = rospy.get_param("~obstacle_topic", "/autopilot/obstacle_status")
     cmd_timeout = float(rospy.get_param("~cmd_timeout", DEFAULT_CMD_TIMEOUT_SECONDS))
     lidar_timeout = float(rospy.get_param("~lidar_timeout", DEFAULT_LIDAR_TIMEOUT_SECONDS))
     publisher = rospy.Publisher(cmd_topic, Twist, queue_size=10)
     supervisor = SafetySupervisor(publisher, Twist, cmd_timeout=cmd_timeout, lidar_timeout=lidar_timeout)
+    rospy.Subscriber(raw_cmd_topic, Twist, supervisor.on_raw_cmd, queue_size=10)
     rospy.Subscriber(obstacle_topic, String, supervisor.on_obstacle_status, queue_size=10)
     rate = rospy.Rate(10)
     while not rospy.is_shutdown():

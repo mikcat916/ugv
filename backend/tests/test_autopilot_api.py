@@ -119,6 +119,107 @@ def test_fresh_lidar_allows_auto_running(monkeypatch):
     assert response.json()["mode"] == "auto_running"
 
 
+def test_autopilot_runtime_default_lidar_timeout_is_two_seconds():
+    runtime = app_module.autopilot_helpers.AutopilotRuntime()
+
+    assert runtime.lidar_timeout_seconds == 2.0
+
+
+def test_stale_lidar_report_faults_and_clears_motion():
+    reset_runtime()
+
+    status = app_module.AUTOPILOT_RUNTIME.update_report(
+        {
+            "mode": "auto_running",
+            "safe": True,
+            "linearX": 0.1,
+            "angularZ": 0.2,
+            "lidar": {
+                "online": True,
+                "ageSeconds": 2.5,
+                "frontMin": 1.5,
+                "obstacleStatus": "front_clear",
+            },
+        }
+    )
+
+    assert status["mode"] == "fault"
+    assert status["safe"] is False
+    assert status["reason"] == "lidar_timeout"
+    assert status["linearX"] == 0.0
+    assert status["angularZ"] == 0.0
+
+
+def test_front_blocked_report_pauses_and_clears_motion():
+    reset_runtime()
+
+    status = app_module.AUTOPILOT_RUNTIME.update_report(
+        {
+            "mode": "auto_running",
+            "safe": True,
+            "linearX": 0.1,
+            "angularZ": 0.2,
+            "lidar": {
+                "online": True,
+                "ageSeconds": 0.0,
+                "frontMin": 0.4,
+                "obstacleStatus": "front_clear",
+            },
+        }
+    )
+
+    assert status["mode"] == "paused"
+    assert status["safe"] is False
+    assert status["reason"] == "front_blocked"
+    assert status["linearX"] == 0.0
+    assert status["angularZ"] == 0.0
+
+
+def test_estop_report_forces_zero_motion():
+    reset_runtime()
+
+    status = app_module.AUTOPILOT_RUNTIME.update_report(
+        {
+            "mode": "auto_running",
+            "safe": True,
+            "linearX": 0.1,
+            "angularZ": 0.2,
+            "estop": True,
+        }
+    )
+
+    assert status["mode"] == "estop"
+    assert status["safe"] is False
+    assert status["reason"] == "user_estop"
+    assert status["linearX"] == 0.0
+    assert status["angularZ"] == 0.0
+
+
+def test_autonomy_events_use_null_robot_id_when_unbound(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(app_module, "mysql_ready", lambda: True)
+
+    def fake_insert(sql, params=None):
+        captured["params"] = params
+        return 42
+
+    monkeypatch.setattr(app_module, "execute_insert", fake_insert)
+
+    inserted = app_module.record_autonomy_event(
+        {
+            "robotId": None,
+            "level": "info",
+            "eventType": "autopilot_started",
+            "message": "started",
+            "data": {},
+            "createdAt": "2026-03-10T12:00:00",
+        }
+    )
+
+    assert inserted == 42
+    assert captured["params"][0] is None
+
+
 def test_pause_resume_stop_endpoints(monkeypatch):
     reset_runtime()
     mock_auth(monkeypatch)

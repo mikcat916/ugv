@@ -126,6 +126,30 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 - 本地开发默认只监听 `127.0.0.1`。
 - 需要局域网访问时再显式使用 `--host 0.0.0.0`。
 
+## 自动驾驶 API
+
+自动驾驶页使用后端内存状态机协调 Web 控制、机器人侧 ROS 节点和安全事件日志。LiDAR 安全默认超时为 `2` 秒，可通过 `AUTOPILOT_LIDAR_TIMEOUT_SECONDS` 覆盖；控制指令超时默认 `10` 秒，可通过 `AUTOPILOT_CONTROL_TIMEOUT_SECONDS` 覆盖。
+
+常用接口：
+
+| 接口 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/autopilot/status` | `GET` | 查询模式、LiDAR、急停、人工接管和事件概览 |
+| `/api/autopilot/events` | `GET` | 查询自动驾驶事件，需要登录 |
+| `/api/autopilot/start` | `POST` | 启动自动驾驶；LiDAR 不新鲜时停在 `auto_ready` |
+| `/api/autopilot/pause` | `POST` | 暂停自动驾驶并向机器人发送停止 |
+| `/api/autopilot/resume` | `POST` | 继续自动驾驶；急停未解除时返回 `409` |
+| `/api/autopilot/stop` | `POST` | 停止自动驾驶并清零速度 |
+| `/api/autopilot/estop` | `POST` | 触发急停并清零速度 |
+| `/api/autopilot/clear-estop` | `POST` | 解除急停，回到手动模式 |
+| `/api/iot/autopilot/status` | `POST` | 机器人侧上报自动驾驶状态，需要设备 Token |
+
+安全规则：
+
+- LiDAR 缺失或超过超时阈值时，状态切为不安全并清零 `linearX` / `angularZ`。
+- `frontMin < 0.5m` 或前方阻塞状态会清零速度；运行中会降到 `paused`，等待人工确认后恢复。
+- `estop=true` 永远优先，后端快照强制为 `mode=estop` 且速度为零。
+
 ## 本地数据库重置与测试数据
 
 清空本地开发数据：

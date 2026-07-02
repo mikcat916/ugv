@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import math
 import sys
 import time
@@ -87,6 +88,77 @@ def test_autopilot_node_clamps_safe_forward_speed():
     assert node.clamp_linear(0.0) == 0.0
     assert node.obstacle_safe({"online": True, "frontMin": 1.2, "obstacleStatus": "front_clear"}) is True
     assert node.obstacle_safe({"online": True, "frontMin": 0.4, "obstacleStatus": "front_blocked"}) is False
+
+
+def test_autopilot_node_default_cmd_topic_is_raw(monkeypatch):
+    node = load_module("autopilot_node_test_args", ROOT / "autopilot_node.py")
+    monkeypatch.setattr(sys, "argv", ["autopilot_node.py"])
+
+    args = node.parse_args()
+
+    assert args.cmd_topic == "/autopilot/cmd_vel_raw"
+
+
+def test_safety_supervisor_forwards_raw_cmd_when_lidar_is_safe():
+    safety = load_module("safety_supervisor_test_forward", ROOT / "safety_supervisor.py")
+
+    class Publisher:
+        def __init__(self):
+            self.messages = []
+
+        def publish(self, msg):
+            self.messages.append(msg)
+
+    class Twist:
+        def __init__(self):
+            self.linear = SimpleNamespace(x=0.0)
+            self.angular = SimpleNamespace(z=0.0)
+
+    publisher = Publisher()
+    supervisor = safety.SafetySupervisor(publisher, Twist)
+    supervisor.on_obstacle_status(
+        SimpleNamespace(data=json.dumps({"online": True, "frontMin": 1.2, "obstacleStatus": "front_clear"}))
+    )
+    cmd = Twist()
+    cmd.linear.x = 0.08
+    cmd.angular.z = 0.2
+
+    supervisor.on_raw_cmd(cmd)
+
+    assert supervisor.last_control_at is not None
+    assert publisher.messages[-1] is cmd
+
+
+def test_safety_supervisor_blocks_raw_cmd_when_front_min_is_too_close():
+    safety = load_module("safety_supervisor_test_front_block", ROOT / "safety_supervisor.py")
+
+    class Publisher:
+        def __init__(self):
+            self.messages = []
+
+        def publish(self, msg):
+            self.messages.append(msg)
+
+    class Twist:
+        def __init__(self):
+            self.linear = SimpleNamespace(x=0.0)
+            self.angular = SimpleNamespace(z=0.0)
+
+    publisher = Publisher()
+    supervisor = safety.SafetySupervisor(publisher, Twist)
+    supervisor.on_obstacle_status(
+        SimpleNamespace(data=json.dumps({"online": True, "frontMin": 0.4, "obstacleStatus": "front_clear"}))
+    )
+    cmd = Twist()
+    cmd.linear.x = 0.08
+    cmd.angular.z = 0.2
+
+    supervisor.on_raw_cmd(cmd)
+
+    assert supervisor.last_reason == "front_blocked"
+    assert publisher.messages[-1] is not cmd
+    assert publisher.messages[-1].linear.x == 0.0
+    assert publisher.messages[-1].angular.z == 0.0
 
 
 def test_autopilot_node_does_not_block_on_slow_backend():

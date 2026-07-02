@@ -256,7 +256,7 @@ CREATE TABLE IF NOT EXISTS control_commands (
 
 CREATE TABLE IF NOT EXISTS autonomy_events (
     id         BIGINT      PRIMARY KEY AUTO_INCREMENT,
-    robot_id   BIGINT      NOT NULL,
+    robot_id   BIGINT      NULL,
     level      VARCHAR(20) NOT NULL,
     event_type VARCHAR(64) NOT NULL,
     message    TEXT        NULL,
