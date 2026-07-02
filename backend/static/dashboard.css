@@ -1256,6 +1256,34 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.autopilot-console {
+  overflow: hidden;
+}
+
+.autopilot-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.autopilot-banner strong {
+  color: var(--text);
+}
+
+.autopilot-actions {
+  justify-content: flex-start;
+}
+
+.autopilot-status-grid strong,
+.autopilot-lidar-grid strong {
+  text-align: right;
+}
+
 .control-key-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));

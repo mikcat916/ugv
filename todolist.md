@@ -1,181 +1,266 @@
-# 本地自用版 Todolist
+下面是专门针对你现在目标的 **小范围自动驾驶 Todolist**，不包含大型自动驾驶、SLAM、复杂导航这些暂时不需要的内容。
 
-只本地跑、自用优先，不按生产级安全和部署复杂度推进。重点是：稳定启动、方便调试、少踩坑、以后自己还能改得动。
+# v0.2 Autopilot MVP Todolist
 
-## P0：先保证一键能跑起来
+## P0：安全基础，必须先做
 
-- [x] 整理一个最简单的本地启动流程
-- [x] 增加或完善 `.env.example`
-- [x] 明确本地默认配置：
-  - [x] 后端端口
-  - [x] MySQL 地址
-  - [x] 数据库名
-  - [x] 默认管理员账号
-  - [x] 是否允许注册
-- [x] 写一个 `start-dev.ps1` 或 `start-dev.bat`
-- [x] 后端启动前自动检查：
-  - [x] Python 环境是否正确
-  - [x] 依赖是否安装
-  - [x] MySQL 是否能连接
-  - [x] 表是否存在
-- [x] README 里加一段「本地启动」步骤，越短越好
+* [x] 新增自动驾驶状态机
 
-目标流程：
+  * [x] `manual`
+  * [x] `auto_ready`
+  * [x] `auto_running`
+  * [x] `paused`
+  * [x] `fault`
+  * [x] `estop`
+* [x] 明确控制优先级
 
 ```text
-1. 创建 .env
-2. 启动 MySQL
-3. 运行 start-dev.ps1
-4. 打开 http://127.0.0.1:8000
+急停 > 人工接管 > 安全监督器 > 自动驾驶 > 普通远程控制
 ```
 
-## P1：修掉明显会影响本地使用的问题
+* [x] 后端新增 `GET /api/autopilot/status`
+* [x] 后端新增 `POST /api/autopilot/start`
+* [x] 后端新增 `POST /api/autopilot/pause`
+* [x] 后端新增 `POST /api/autopilot/resume`
+* [x] 后端新增 `POST /api/autopilot/stop`
+* [x] 后端新增 `POST /api/autopilot/estop`
+* [x] 后端新增 `POST /api/autopilot/clear-estop`
+* [x] Web 页面增加急停按钮
+* [x] 桌面端增加急停按钮
+* [x] 急停触发后立即停车
+* [x] 急停后必须手动解除，不能自动恢复
+* [x] 手动控制时自动驾驶自动暂停
+* [x] 自动模式下限制最大线速度
+* [x] 自动模式下限制最大角速度
+* [x] 控制指令超时后自动停车
+* [x] LiDAR 数据超时后自动停车
 
-- [x] 修正 `ALLOW_SELF_REGISTER` 默认值和 README 不一致的问题
-- [x] 保留本地默认账号可以，但在 README 里写清楚“仅限本地使用”
-- [x] `SESSION_SECRET` 本地可以给默认值，但建议改成清楚一点，例如 `dev-local-secret`
-- [x] 启动脚本默认绑定 `127.0.0.1`，不要默认 `0.0.0.0`
-- [x] 本地开发可以继续使用 `--reload`
-- [x] 把启动脚本里的提示信息改准确：
-  - [x] 后端地址
-  - [x] 默认账号
-  - [x] 数据库连接状态
-  - [x] 常见失败原因
+## P1：LiDAR 避障
 
-## P2：修依赖问题，避免换电脑就跑不起来
+* [x] 新增 `scripts/lidar_obstacle.py`
+* [x] 订阅 ROS `/scan`
+* [x] 过滤无效距离值：
 
-- [x] 确定一个统一 Python 版本，建议直接用 Python 3.11
-- [x] 后端 README 写清楚 Python 版本
-- [x] 桌面端 README 写清楚 Python 版本
-- [x] 修正 `numpy>=2.4.2` 这类可能导致安装失败的版本要求
-- [x] 桌面端尽量统一 PyQt 版本：
-  - [x] 只保留 PyQt5，或
-  - [ ] 只保留 PyQt6
-- [x] 后端依赖加一个简单版本锁定
-- [x] 桌面端依赖加一个简单版本锁定
-- [x] 增加 `requirements-dev.txt`，放测试和代码格式化工具
+  * [x] `inf`
+  * [x] `nan`
+  * [x] `0`
+  * [x] 小于 `range_min`
+  * [x] 大于 `range_max`
+* [x] 将雷达分成三个区域：
 
-## P3：让数据库初始化更省心
+  * [x] 左前
+  * [x] 正前
+  * [x] 右前
+* [x] 计算 `left_front_min`
+* [x] 计算 `front_min`
+* [x] 计算 `right_front_min`
+* [x] 生成 `obstacle_status`
+* [x] 生成建议线速度 `linear_x`
+* [x] 生成建议角速度 `angular_z`
+* [x] 正前 `< 0.5m` 强制停车
+* [x] 正前 `0.5m ~ 1.0m` 自动减速
+* [x] 左前近、右前远时向右避让
+* [x] 右前近、左前远时向左避让
+* [x] 左右都近时停车
+* [x] 雷达超过 2 秒无数据时停车
 
-- [x] 第一次启动时自动创建数据库表
-- [x] 数据库初始化失败时给出明确错误
-- [x] 不要静默失败
-- [x] 加一个 `reset-db-dev.sql`，方便本地清库重来
-- [x] 加一个 `seed-dev.sql`，插入本地测试数据
-- [x] 给 README 加说明：
-  - [x] 如何初始化数据库
-  - [x] 如何重置数据库
-  - [x] 如何导入测试数据
+## P2：车端自动驾驶主循环
 
-本地自用可以先不引入 Alembic，简单 SQL 文件够用。
+* [x] 新增 `scripts/safety_supervisor.py`
+* [x] 新增 `scripts/autopilot_node.py`
+* [x] 自动驾驶节点读取当前模式
+* [x] 自动驾驶节点读取急停状态
+* [x] 自动驾驶节点读取人工接管状态
+* [x] 自动驾驶节点读取 LiDAR 避障结果
+* [x] 自动模式下发布 `/cmd_vel`
+* [x] 默认线速度上限为 `0.1 m/s`
+* [x] 默认角速度限制为安全范围
+* [x] LiDAR 正常且前方安全时低速前进
+* [x] 前方较近时减速
+* [x] 前方过近时停车
+* [x] 障碍消失后继续低速前进
+* [x] 任何异常状态下发布停车指令
+* [x] 自动驾驶状态定期上报后端
 
-## P4：减少大文件维护痛苦
+## P3：后端状态与事件日志
 
-后端 `main.py` 太大，先轻量拆分，不做一次性大重构。
+* [x] 新增 `backend/autopilot.py`
+* [x] 保存最近一次自动驾驶状态
+* [x] 保存最近一次 LiDAR 避障状态
+* [x] 保存最近一次控制状态
+* [x] 新增 `autonomy_events` 表
 
-- [x] 先把配置相关代码拆到 `config.py`
-- [x] 把登录、注册、权限相关代码拆到 `auth.py`
-- [x] 把数据库连接和初始化代码拆到 `db.py`
-- [x] 把机器人控制相关代码拆到 `robot_control.py`
-- [x] 把 IoT 上报相关代码拆到 `iot.py`
-- [x] 保留 `main.py` 作为入口，只负责挂载路由和启动应用
+```sql
+CREATE TABLE autonomy_events (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  robot_id BIGINT NOT NULL,
+  level VARCHAR(20) NOT NULL,
+  event_type VARCHAR(64) NOT NULL,
+  message TEXT,
+  data_json JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
-推荐先变成这样：
+* [x] 记录自动驾驶启动事件
+* [x] 记录自动驾驶暂停事件
+* [x] 记录自动驾驶恢复事件
+* [x] 记录自动驾驶停止事件
+* [x] 记录急停事件
+* [x] 记录解除急停事件
+* [x] 记录 LiDAR 超时事件
+* [x] 记录前方障碍物过近事件
+* [x] 记录人工接管事件
+* [x] `GET /api/autopilot/status` 返回当前状态和原因
+
+推荐返回格式：
+
+```json
+{
+  "mode": "auto_running",
+  "safe": true,
+  "reason": "front_clear",
+  "linearX": 0.1,
+  "angularZ": 0.0,
+  "lidar": {
+    "online": true,
+    "ageSeconds": 0.4,
+    "frontMin": 1.8,
+    "leftFrontMin": 1.2,
+    "rightFrontMin": 2.1
+  },
+  "manualOverride": false,
+  "estop": false
+}
+```
+
+## P4：Web 自动驾驶面板
+
+* [x] 新增或扩展自动驾驶页面
+* [x] 显示当前模式
+* [x] 显示是否安全
+* [x] 显示当前决策原因
+* [x] 显示当前线速度
+* [x] 显示当前角速度
+* [x] 显示 LiDAR 在线状态
+* [x] 显示 LiDAR 数据年龄
+* [x] 显示正前最近距离
+* [x] 显示左前最近距离
+* [x] 显示右前最近距离
+* [x] 显示人工接管状态
+* [x] 显示急停状态
+* [x] 增加启动自动驾驶按钮
+* [x] 增加暂停按钮
+* [x] 增加继续按钮
+* [x] 增加停止按钮
+* [x] 增加急停按钮
+* [x] 增加解除急停按钮
+* [x] 显示最近 20 条自动驾驶事件
+
+状态文案建议：
 
 ```text
-backend/
-  main.py
-  config.py
-  db.py
-  auth.py
-  robot_control.py
-  iot.py
+自动驾驶运行中：前方安全，低速前进
+自动驾驶减速：前方 0.82m 有障碍物
+自动驾驶暂停：前方 0.41m 障碍物过近
+自动驾驶故障：LiDAR 超过 2 秒未更新
+自动驾驶急停：用户触发急停
 ```
 
-不用一上来搞复杂的 `services/ repositories/ schemas/` 分层。
+## P5：桌面端自动驾驶控制
 
-## P5：前端先别大改，只做可维护拆分
+* [x] 桌面端增加自动驾驶状态区域
+* [x] 显示后端连接状态
+* [x] 显示当前自动驾驶模式
+* [x] 显示当前安全状态
+* [x] 显示当前原因
+* [x] 显示 LiDAR 正前距离
+* [x] 增加启动按钮
+* [x] 增加暂停按钮
+* [x] 增加继续按钮
+* [x] 增加停止按钮
+* [x] 增加急停按钮
+* [x] 增加解除急停按钮
+* [x] 后端断开时禁用自动驾驶按钮
+* [x] 急停按钮始终保持可点，除非完全离线
 
-- [x] 给 `dashboard.js` 加清楚的分区注释
-- [x] 先抽出 API 请求函数
-- [x] 再抽出 WebSocket 相关函数
-- [x] 再抽出通用 UI 函数
-- [x] 暂时不需要上 Vue/React
-- [x] 暂时不需要复杂打包工具
+## P6：本地测试流程
 
-建议先拆成：
+* [x] 增加 `docs/autopilot-local-test.md`
+* [x] 测试后端能启动
+* [x] 测试 Web 页面能打开
+* [x] 测试桌面端能连接后端
+* [x] 测试 `/api/autopilot/status`
+* [x] 测试启动自动驾驶
+* [x] 测试暂停自动驾驶
+* [x] 测试继续自动驾驶
+* [x] 测试停止自动驾驶
+* [x] 测试急停
+* [x] 测试解除急停
+* [x] 模拟 LiDAR 正前 `< 0.5m`
+* [x] 确认自动停车
+* [x] 模拟 LiDAR 正前 `0.5m ~ 1.0m`
+* [x] 确认自动减速
+* [x] 模拟 LiDAR 超过 2 秒无数据
+* [x] 确认进入故障或停车状态
+* [x] 测试手动控制时自动驾驶暂停
+* [x] 测试事件日志是否记录
+
+## P7：回归测试
+
+* [x] 测试 `GET /api/autopilot/status`
+* [x] 测试 `POST /api/autopilot/start`
+* [x] 测试 `POST /api/autopilot/pause`
+* [x] 测试 `POST /api/autopilot/resume`
+* [x] 测试 `POST /api/autopilot/stop`
+* [x] 测试 `POST /api/autopilot/estop`
+* [x] 测试 `POST /api/autopilot/clear-estop`
+* [x] 测试急停状态下不能启动自动驾驶
+* [x] 测试 LiDAR 超时状态下不能进入 `auto_running`
+* [x] 测试手动接管会暂停自动驾驶
+* [x] 测试事件日志写入
+* [x] 测试非法状态切换会被拒绝
+
+## P8：暂时不要做的内容
+
+* [ ] 不做公共道路自动驾驶
+* [ ] 不做高速运动
+* [ ] 不做复杂 SLAM
+* [ ] 不做视觉识别
+* [ ] 不做多车协同
+* [ ] 不做云端远程自动驾驶
+* [ ] 不做复杂路径规划
+* [ ] 不做自动回充
+
+## 推荐执行顺序
 
 ```text
-backend/static/
-  dashboard.js
-  api.js
-  websocket.js
-  ui.js
+1. backend/autopilot.py
+2. /api/autopilot/status
+3. /api/autopilot/estop
+4. Web 急停按钮
+5. 桌面端急停按钮
+6. safety_supervisor.py
+7. lidar_obstacle.py
+8. autopilot_node.py
+9. Web 自动驾驶状态面板
+10. autonomy_events
+11. 回归测试
+12. docs/autopilot-local-test.md
 ```
 
-## P6：加一点测试，够自己防回归就行
+## 最小交付标准
 
-不用追求覆盖率，先测最容易坏的地方。
+做到下面这些，就可以算第一版小范围自动驾驶 MVP 完成：
 
-- [x] 测试登录成功
-- [x] 测试登录失败
-- [x] 测试未登录访问受保护接口
-- [x] 测试 IoT 数据上报
-- [x] 测试机器人状态接口
-- [x] 测试数据库初始化
-- [x] 加一个最小 `pytest` 命令说明
-
-目标不是“测试很完整”，而是以后改代码时能快速知道有没有改坏主流程。
-
-## P7：增加本地开发体验
-
-- [x] 增加 `/health` 接口
-- [x] 增加 `/debug/config` 接口，仅本地开发启用
-- [x] 日志输出更清楚
-- [x] 报错时显示具体原因，而不是只返回 500
-- [x] 增加本地调试模式 `DEBUG=1`
-- [x] 把常见错误写到 README：
-  - [x] MySQL 连不上
-  - [x] 端口被占用
-  - [x] 依赖安装失败
-  - [x] 登录失败
-  - [x] 桌面端打不开
-
-## P8：桌面端自用优化
-
-- [x] 确认桌面端启动命令
-- [x] 写一个 `start-desktop.ps1`
-- [x] 把后端地址做成配置项
-- [x] 默认连接 `http://127.0.0.1:8000`
-- [x] 连接失败时弹窗显示原因
-- [x] 增加“重新连接”按钮
-- [x] 桌面端启动时检查后端是否在线
-- [x] 桌面端 README 写清楚启动顺序
-
-## 建议实际执行顺序
-
-1. 修 `.env.example`
-2. 修 README 本地启动说明
-3. 写 `start-dev.ps1`
-4. 修 `ALLOW_SELF_REGISTER` 默认值
-5. 把后端默认监听改成 `127.0.0.1`
-6. 统一 Python 版本
-7. 修桌面端依赖
-8. 增加数据库初始化/重置脚本
-9. 拆 `config.py`
-10. 拆 `db.py`
-11. 拆 `auth.py`
-12. 加 `/health`
-13. 加 3 到 5 个关键测试
-14. 再慢慢拆 `dashboard.js`
-
-## 近期遗留事项
-
-- [x] 整理 `desktop/README.md`，清理乱码和无效占位内容
-- [x] 从 `backend/` 目录补跑更完整的测试集
-- [x] 补充树莓派 GPS / `gpsd` / 串口链路本地诊断说明；实车链路另行硬件验证
-
-## 备注
-
-- 历史阶段性计划见 [docs/planning/todolist.md](docs/planning/todolist.md)
-- 这个文件用于记录当前会话和近期的实际待办
+```text
+- Web
+- 可以启动自动模式
+- 自动模式下低速前进
+- LiDAR 正前小于 0.5m 自动停车
+- LiDAR 正前 0.5m 到 1.0m 自动减速
+- LiDAR 超时自动停车
+- 手动控制会暂停自动驾驶
+- 页面能看到当前状态和原因
+- 事件日志能记录急停、启动、暂停、障碍物停车
+```

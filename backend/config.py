@@ -66,6 +66,7 @@ PAGES = {
     "perception": {"route": "/perception", "title": "智能感知", "kicker": "Orin AI"},
     "maps": {"route": "/maps", "title": "地图展示", "kicker": "SLAM 地图"},
     "control": {"route": "/control", "title": "远程遥控", "kicker": "车辆控制"},
+    "autopilot": {"route": "/autopilot", "title": "自动驾驶", "kicker": "安全自动模式"},
     "device_management": {"route": "/device-management", "title": "设备管理", "kicker": "设备体系"},
     "users": {"route": "/users", "title": "用户管理", "kicker": "本地账号"},
     "clusters": {"route": "/clusters", "title": "集群管理", "kicker": "节点编队"},

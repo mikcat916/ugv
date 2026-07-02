@@ -1,5 +1,5 @@
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import QTimer, QRectF, QSize
+from PyQt5.QtCore import QTimer, QRectF, QSize, pyqtSignal
 from PyQt5.QtGui import QColor, QPainterPath, QRegion, QTransform, QIcon
 from qfluentwidgets import FluentIcon as FIF, ThemeColor
 from PyQt5.QtWidgets import QGraphicsDropShadowEffect
@@ -21,8 +21,17 @@ from PyQt5.QtGui import QImage, QPixmap
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 from UI.generated.content import Ui_Form
 
+try:
+    from app.backend_config import backend_url, get_autopilot_status, post_autopilot_action
+except ImportError:
+    sys.path.append(str(Path(__file__).resolve().parents[3]))
+    from app.backend_config import backend_url, get_autopilot_status, post_autopilot_action
+
 
 class ContentPage(QtWidgets.QWidget, Ui_Form):
+    autopilot_status_loaded = pyqtSignal(dict)
+    autopilot_action_finished = pyqtSignal(dict)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setupUi(self)
@@ -42,6 +51,7 @@ class ContentPage(QtWidgets.QWidget, Ui_Form):
         self.apply_topbar_style()
         self.apply_estop_style()
         self.setup_gauge_labels()
+        self.setup_autopilot_panel()
 
         # ===== ROS 控制初始化 =====
         self.ros = None
@@ -56,6 +66,11 @@ class ContentPage(QtWidgets.QWidget, Ui_Form):
         # 当前速度状态
         self.current_linear_x = 0.0
         self.current_angular_z = 0.0
+        self.backend_url = backend_url()
+        self._autopilot_online = False
+        self._autopilot_busy = False
+        self.autopilot_status_loaded.connect(self._apply_autopilot_status)
+        self.autopilot_action_finished.connect(self._apply_autopilot_action_result)
 
         # 10Hz 发布（等价 rostopic pub -r 10）
         self.cmd_timer = QTimer(self)
@@ -94,6 +109,12 @@ class ContentPage(QtWidgets.QWidget, Ui_Form):
         self._t = QTimer(self)
         self._t.timeout.connect(self._mock_update)
         self._t.start(800)
+
+        self.autopilot_timer = QTimer(self)
+        self.autopilot_timer.setInterval(2000)
+        self.autopilot_timer.timeout.connect(self.refresh_autopilot_status)
+        self.autopilot_timer.start()
+        QTimer.singleShot(300, self.refresh_autopilot_status)
 
     # =========================================================
     # ROS cmd_vel 控制
@@ -367,6 +388,134 @@ class ContentPage(QtWidgets.QWidget, Ui_Form):
 
     def setup_gauge_labels(self) -> None:
         pass
+
+    def setup_autopilot_panel(self) -> None:
+        self.autopilotPanel = QtWidgets.QFrame(self.frameDriveInfo)
+        self.autopilotPanel.setObjectName("autopilotPanel")
+        self.autopilotPanel.setStyleSheet(
+            "QFrame#autopilotPanel {"
+            "background: rgba(255, 255, 255, 115);"
+            "border: 1px solid rgba(16, 24, 40, 28);"
+            "border-radius: 12px;"
+            "}"
+            "QLabel { color: #243044; font-size: 12px; }"
+            "QPushButton { border-radius: 8px; padding: 6px 10px; background: rgba(255,255,255,180); }"
+            "QPushButton:disabled { color: rgba(36,48,68,100); background: rgba(255,255,255,80); }"
+            "QPushButton#desktopAutopilotEStop { color: white; background: #dc2626; font-weight: 700; }"
+        )
+        layout = QtWidgets.QVBoxLayout(self.autopilotPanel)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(6)
+
+        self.autopilotTitle = QtWidgets.QLabel("自动驾驶状态", self.autopilotPanel)
+        self.autopilotTitle.setStyleSheet("font-weight: 700; color: #101828;")
+        layout.addWidget(self.autopilotTitle)
+
+        self.autopilotStatusLabel = QtWidgets.QLabel("后端连接：检查中", self.autopilotPanel)
+        self.autopilotStatusLabel.setWordWrap(True)
+        layout.addWidget(self.autopilotStatusLabel)
+
+        self.autopilotDetailLabel = QtWidgets.QLabel("模式：-  安全：-  原因：-", self.autopilotPanel)
+        self.autopilotDetailLabel.setWordWrap(True)
+        layout.addWidget(self.autopilotDetailLabel)
+
+        self.autopilotLidarLabel = QtWidgets.QLabel("LiDAR 正前：-", self.autopilotPanel)
+        layout.addWidget(self.autopilotLidarLabel)
+
+        button_row = QtWidgets.QHBoxLayout()
+        button_row.setSpacing(6)
+        self.autopilotButtons = {}
+        for action, text in [
+            ("start", "启动"),
+            ("pause", "暂停"),
+            ("resume", "继续"),
+            ("stop", "停止"),
+            ("clear-estop", "解除"),
+        ]:
+            btn = QtWidgets.QPushButton(text, self.autopilotPanel)
+            btn.clicked.connect(lambda _checked=False, name=action: self.send_autopilot_action(name))
+            self.autopilotButtons[action] = btn
+            button_row.addWidget(btn)
+        layout.addLayout(button_row)
+
+        drive_layout = getattr(self, "driveLayout", None)
+        if drive_layout is not None:
+            drive_layout.addWidget(self.autopilotPanel)
+
+        self.desktopAutopilotEStop = QtWidgets.QPushButton("急停", self.frameEStop)
+        self.desktopAutopilotEStop.setObjectName("desktopAutopilotEStop")
+        self.desktopAutopilotEStop.clicked.connect(lambda: self.send_autopilot_action("estop"))
+        if hasattr(self, "estopLayout"):
+            self.estopLayout.addWidget(self.desktopAutopilotEStop)
+
+        self._set_autopilot_buttons_enabled(False)
+
+    def _set_autopilot_buttons_enabled(self, backend_online: bool, estop: bool = False) -> None:
+        busy = getattr(self, "_autopilot_busy", False)
+        for action, button in getattr(self, "autopilotButtons", {}).items():
+            enabled = backend_online and not busy
+            if action == "clear-estop":
+                enabled = enabled and estop
+            elif estop:
+                enabled = False
+            button.setEnabled(enabled)
+        if hasattr(self, "desktopAutopilotEStop"):
+            self.desktopAutopilotEStop.setEnabled(backend_online and not busy)
+
+    def refresh_autopilot_status(self) -> None:
+        def worker():
+            result = get_autopilot_status(self.backend_url)
+            self.autopilot_status_loaded.emit(result)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def send_autopilot_action(self, action: str) -> None:
+        if self._autopilot_busy:
+            return
+        self._autopilot_busy = True
+        self._set_autopilot_buttons_enabled(self._autopilot_online)
+        if action in {"pause", "stop", "estop"}:
+            self.stop_motion()
+
+        def worker():
+            result = post_autopilot_action(action, url=self.backend_url)
+            result["action"] = action
+            self.autopilot_action_finished.emit(result)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _apply_autopilot_status(self, status: dict) -> None:
+        ok = bool(status.get("ok"))
+        self._autopilot_online = ok
+        if not ok:
+            message = status.get("message") or "后端连接失败"
+            self.autopilotStatusLabel.setText(f"后端连接：离线 ({message})")
+            self.autopilotDetailLabel.setText("模式：-  安全：-  原因：-")
+            self.autopilotLidarLabel.setText("LiDAR 正前：-")
+            self._set_autopilot_buttons_enabled(False)
+            return
+        mode = status.get("mode") or "-"
+        safe = "安全" if status.get("safe", False) else "不安全"
+        reason = status.get("reason") or "-"
+        lidar = status.get("lidar") or {}
+        front = lidar.get("frontMin")
+        try:
+            front_text = f"{float(front):.2f} m"
+        except (TypeError, ValueError):
+            front_text = "-"
+        self.autopilotStatusLabel.setText(f"后端连接：在线 ({status.get('url', self.backend_url)})")
+        self.autopilotDetailLabel.setText(f"模式：{mode}  安全：{safe}  原因：{reason}")
+        self.autopilotLidarLabel.setText(f"LiDAR 正前：{front_text}")
+        self._set_autopilot_buttons_enabled(True, bool(status.get("estop")))
+
+    def _apply_autopilot_action_result(self, result: dict) -> None:
+        self._autopilot_busy = False
+        if not result.get("ok"):
+            self._autopilot_online = False
+            self.autopilotStatusLabel.setText(f"后端连接：动作失败 ({result.get('message', '未知错误')})")
+            self._set_autopilot_buttons_enabled(False)
+            return
+        self._apply_autopilot_status(result)
 
     def _ensure_fullscreen_button(self) -> None:
         if hasattr(self, "btnMax"):

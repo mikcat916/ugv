@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -57,3 +58,66 @@ def check_backend_health(url: str | None = None, timeout: float = 2.5) -> dict[s
         "mysqlReady": bool(payload.get("mysqlReady")),
         "message": payload.get("detail") or ("后端在线" if status == "ok" else f"后端状态异常：{status or 'unknown'}"),
     }
+
+
+def _backend_credentials() -> tuple[str, str]:
+    env_values = _load_env_file(ENV_FILE)
+    username = (
+        _env_value("UGV_BACKEND_USERNAME", env_values)
+        or _env_value("ADMIN_USERNAME", env_values)
+        or "admin"
+    )
+    password = (
+        _env_value("UGV_BACKEND_PASSWORD", env_values)
+        or _env_value("ADMIN_PASSWORD", env_values)
+        or "admin123"
+    )
+    return username, password
+
+
+def _login_session(target: str, timeout: float) -> requests.Session:
+    session = requests.Session()
+    login_page = session.get(f"{target}/login", timeout=timeout)
+    login_page.raise_for_status()
+    match = re.search(r'loginToken:\s*"([^"]+)"', login_page.text)
+    if not match:
+        raise RuntimeError("后端登录页未返回 loginToken。")
+    username, password = _backend_credentials()
+    response = session.post(
+        f"{target}/auth/login",
+        json={"username": username, "password": password, "loginToken": match.group(1)},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    return session
+
+
+def get_autopilot_status(url: str | None = None, timeout: float = 2.5) -> dict[str, Any]:
+    target = (url or backend_url()).rstrip("/")
+    try:
+        response = requests.get(f"{target}/api/autopilot/status", timeout=timeout)
+        response.raise_for_status()
+        payload = response.json()
+    except requests.RequestException as exc:
+        return {"ok": False, "url": target, "message": str(exc)}
+    except ValueError as exc:
+        return {"ok": False, "url": target, "message": f"后端返回非 JSON 响应：{exc}"}
+    payload["ok"] = True
+    payload["url"] = target
+    return payload
+
+
+def post_autopilot_action(action: str, payload: dict[str, Any] | None = None, url: str | None = None, timeout: float = 3.5) -> dict[str, Any]:
+    target = (url or backend_url()).rstrip("/")
+    try:
+        session = _login_session(target, timeout)
+        response = session.post(f"{target}/api/autopilot/{action}", json=payload or {}, timeout=timeout)
+        response.raise_for_status()
+        data = response.json()
+    except requests.RequestException as exc:
+        return {"ok": False, "url": target, "message": str(exc)}
+    except (RuntimeError, ValueError) as exc:
+        return {"ok": False, "url": target, "message": str(exc)}
+    data["ok"] = bool(data.get("ok", True))
+    data["url"] = target
+    return data

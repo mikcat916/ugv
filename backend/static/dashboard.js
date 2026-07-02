@@ -24,6 +24,7 @@ const SENSOR_STALE_FALLBACK_SECONDS = 8;
 const LIDAR_SWEEP_DURATION_MS = 1200;
 const LIDAR_TRAIL_LIMIT = 24;
 const LIDAR_REFRESH_MS = 1500;
+const AUTOPILOT_REFRESH_MS = 2000;
 
 const state = {
   pageId: appConfig.pageId,
@@ -112,6 +113,14 @@ const state = {
     lastAck: null,
     lastSentAt: "",
   },
+  autopilot: {
+    robotId: "",
+    status: null,
+    error: "",
+    loading: false,
+    actionInFlight: "",
+    timer: null,
+  },
   deviceManagementTab: "categories",
   clusterManagementTab: "clusters",
   managementFilters: {
@@ -180,6 +189,28 @@ const CONTROL_KEY_BINDINGS = {
   KeyE: { linear: 1, angular: -1 },
   KeyZ: { linear: -1, angular: -1 },
   KeyC: { linear: -1, angular: 1 },
+};
+const AUTOPILOT_MODE_TEXT = {
+  manual: "手动",
+  auto_ready: "自动就绪",
+  auto_running: "自动运行",
+  paused: "暂停",
+  fault: "故障",
+  estop: "急停",
+};
+const AUTOPILOT_REASON_TEXT = {
+  manual_control: "人工控制",
+  front_clear: "前方安全，低速前进",
+  front_slow: "前方较近，自动减速",
+  front_blocked: "前方障碍物过近，停车",
+  both_front_blocked: "左右前方均受阻，停车",
+  lidar_timeout: "LiDAR 超过 2 秒未更新",
+  control_timeout: "控制指令超时",
+  user_paused: "用户暂停",
+  stopped_by_user: "用户停止",
+  manual_override: "人工接管",
+  user_estop: "用户触发急停",
+  estop_cleared: "急停已手动解除",
 };
 const URL_SYNC_PAGE_IDS = new Set(["devices"]);
 const COMMAND_PAGE_IDS = new Set([]);
@@ -2162,6 +2193,246 @@ function formatControlAckVelocity(ack) {
   return `${v.toFixed(3)} / ${w.toFixed(3)}`;
 }
 
+// ===== Autopilot page =====
+function autopilotRobots() {
+  return controlRobots();
+}
+
+function findAutopilotRobot(robotId) {
+  return autopilotRobots().find((robot) => String(robot.id) === String(robotId)) || null;
+}
+
+function resolveAutopilotRobot() {
+  const robots = autopilotRobots();
+  if (!robots.length) {
+    state.autopilot.robotId = "";
+    return null;
+  }
+  const current = findAutopilotRobot(state.autopilot.robotId);
+  if (current) return current;
+  const statusRobotId = state.autopilot.status?.robotId;
+  const fromStatus = statusRobotId ? findAutopilotRobot(statusRobotId) : null;
+  const next = fromStatus || robots.find(robotIsOnline) || robots[0];
+  state.autopilot.robotId = String(next.id);
+  return next;
+}
+
+function selectedAutopilotRobotId() {
+  return String(document.getElementById("autopilot-robot")?.value || state.autopilot.robotId || "").trim();
+}
+
+function autopilotModeText(mode) {
+  const key = String(mode || "").trim();
+  return AUTOPILOT_MODE_TEXT[key] || key || "-";
+}
+
+function autopilotReasonText(reason, status = null) {
+  const key = String(reason || "").trim();
+  if (key === "front_slow" && status?.lidar?.frontMin !== undefined && status?.lidar?.frontMin !== null) {
+    return `前方 ${Number(status.lidar.frontMin).toFixed(2)}m 有障碍物，自动减速`;
+  }
+  if (key === "front_blocked" && status?.lidar?.frontMin !== undefined && status?.lidar?.frontMin !== null) {
+    return `前方 ${Number(status.lidar.frontMin).toFixed(2)}m 障碍物过近，停车`;
+  }
+  return AUTOPILOT_REASON_TEXT[key] || key || "-";
+}
+
+function autopilotStatusTone(status) {
+  if (status?.estop || status?.mode === "estop") return pillClass("danger");
+  if (status?.mode === "fault" || status?.safe === false) return pillClass("warning");
+  if (status?.mode === "auto_running") return pillClass("online");
+  return pillClass("neutral");
+}
+
+function formatNullableDistance(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? `${numeric.toFixed(2)} m` : "-";
+}
+
+function formatNullableSeconds(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? `${numeric.toFixed(2)} s` : "-";
+}
+
+function autopilotActionDisabled(action, selectedRobot, status) {
+  const noTarget = !selectedRobot && !String(appConfig.robotControl?.host || "").trim();
+  const offline = selectedRobot && robotIsOffline(selectedRobot);
+  if (state.autopilot.actionInFlight) return " disabled";
+  if (noTarget) return " disabled";
+  if (offline && action !== "status") return " disabled";
+  if (status?.estop || status?.mode === "estop") {
+    return action === "clear-estop" ? "" : " disabled";
+  }
+  if (action === "clear-estop") return " disabled";
+  if (action === "pause" && status?.mode !== "auto_running") return " disabled";
+  if (action === "resume" && !["paused", "auto_ready", "fault"].includes(String(status?.mode || ""))) return " disabled";
+  return "";
+}
+
+function renderAutopilotPage() {
+  const selectedRobot = resolveAutopilotRobot();
+  const status = state.autopilot.status || {};
+  const lidar = status.lidar || {};
+  const modeTone = autopilotStatusTone(status);
+  const selectableRobots = autopilotRobots();
+  const targetName = selectedRobot ? selectedRobot.model : "未选择机器人";
+  const targetHost = selectedRobot?.ipAddress || appConfig.robotControl?.host || "未配置";
+  const targetNetwork = selectedRobot ? localizeToken(selectedRobot.networkStatus || selectedRobot.telemetryStatus || "offline") : "无可控车辆";
+  const events = Array.isArray(status.events) ? status.events : [];
+  const error = state.autopilot.error ? `<p class="form-error" role="alert">${escapeHtml(state.autopilot.error)}</p>` : "";
+  const actionButton = (action, label, className = "secondary-button") => (
+    `<button class="${className}" type="button" data-autopilot-action="${escapeHtml(action)}"${autopilotActionDisabled(action, selectedRobot, status)}>${escapeHtml(label)}</button>`
+  );
+
+  return `
+    <section class="panel autopilot-console">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Autopilot MVP</p>
+          <h2>自动驾驶安全面板</h2>
+          <p class="muted">控制优先级：急停 > 人工接管 > 安全监督器 > 自动驾驶 > 普通远程控制。</p>
+        </div>
+        <div class="button-row">
+          <select id="autopilot-robot"${selectableRobots.length ? "" : " disabled"}>
+            ${renderControlRobotOptions(state.autopilot.robotId)}
+          </select>
+          <button class="secondary-button" id="autopilot-refresh" type="button"${state.autopilot.loading ? " disabled" : ""}>刷新</button>
+          ${actionButton("estop", "急停", "danger-button critical-action")}
+        </div>
+      </div>
+      ${error}
+      <div class="autopilot-banner">
+        <span class="${modeTone}">${escapeHtml(autopilotModeText(status.mode))}</span>
+        <strong>${escapeHtml(autopilotReasonText(status.reason, status))}</strong>
+        <span class="muted">${escapeHtml(targetName)} · ${escapeHtml(targetHost)} · ${escapeHtml(targetNetwork)}</span>
+      </div>
+      <div class="control-status-strip autopilot-status-grid">
+        <span>安全状态 <strong>${status.safe === false ? "不安全" : "安全"}</strong></span>
+        <span>线速度 <strong>${escapeHtml(formatNullableDistance(status.linearX).replace(" m", " m/s"))}</strong></span>
+        <span>角速度 <strong>${Number.isFinite(Number(status.angularZ)) ? `${Number(status.angularZ).toFixed(3)} rad/s` : "-"}</strong></span>
+        <span>人工接管 <strong>${status.manualOverride ? "是" : "否"}</strong></span>
+        <span>急停 <strong>${status.estop ? "已触发" : "未触发"}</strong></span>
+        <span>更新时间 <strong>${escapeHtml(formatDateTime(status.updatedAt))}</strong></span>
+      </div>
+      <div class="button-row autopilot-actions">
+        ${actionButton("start", "启动自动驾驶", "primary-button")}
+        ${actionButton("pause", "暂停")}
+        ${actionButton("resume", "继续")}
+        ${actionButton("stop", "停止")}
+        ${actionButton("clear-estop", "解除急停")}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h3>LiDAR 避障状态</h3>
+          <p class="muted">来自车端自动驾驶节点的最新避障决策。</p>
+        </div>
+      </div>
+      <div class="control-status-strip autopilot-lidar-grid">
+        <span>在线 <strong>${lidar.online ? "在线" : "离线"}</strong></span>
+        <span>数据年龄 <strong>${escapeHtml(formatNullableSeconds(lidar.ageSeconds))}</strong></span>
+        <span>正前最近 <strong>${escapeHtml(formatNullableDistance(lidar.frontMin))}</strong></span>
+        <span>左前最近 <strong>${escapeHtml(formatNullableDistance(lidar.leftFrontMin))}</strong></span>
+        <span>右前最近 <strong>${escapeHtml(formatNullableDistance(lidar.rightFrontMin))}</strong></span>
+        <span>障碍状态 <strong>${escapeHtml(autopilotReasonText(lidar.obstacleStatus || status.reason, status))}</strong></span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h3>最近事件</h3>
+          <p class="muted">最近 20 条自动驾驶状态与安全事件。</p>
+        </div>
+      </div>
+      ${events.length ? `
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>时间</th><th>等级</th><th>类型</th><th>消息</th></tr></thead>
+            <tbody>
+              ${events.map((event) => `
+                <tr>
+                  <td>${escapeHtml(formatDateTime(event.createdAt))}</td>
+                  <td><span class="${pillClass(event.level || "info")}">${escapeHtml(localizeToken(event.level || "info"))}</span></td>
+                  <td>${escapeHtml(event.eventType || "-")}</td>
+                  <td>${escapeHtml(event.message || "-")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      ` : `<div class="empty-state">暂无自动驾驶事件。</div>`}
+    </section>
+  `;
+}
+
+async function loadAutopilotStatus(force = false) {
+  if (state.autopilot.loading && !force) return;
+  state.autopilot.loading = true;
+  state.autopilot.error = "";
+  try {
+    const payload = await apiFetch("/api/autopilot/status?limit=20");
+    state.autopilot.status = payload;
+  } catch (error) {
+    state.autopilot.error = error.message;
+  } finally {
+    state.autopilot.loading = false;
+    if (state.pageId === "autopilot") {
+      renderCurrentPage();
+    }
+  }
+}
+
+async function sendAutopilotAction(action) {
+  if (state.autopilot.actionInFlight) return;
+  state.autopilot.actionInFlight = action;
+  state.autopilot.error = "";
+  renderCurrentPage();
+  try {
+    const robotId = selectedAutopilotRobotId();
+    const payload = await apiFetch(`/api/autopilot/${action}`, {
+      method: "POST",
+      body: JSON.stringify(robotId ? { robotId } : {}),
+    });
+    state.autopilot.status = payload;
+  } catch (error) {
+    state.autopilot.error = error.message;
+  } finally {
+    state.autopilot.actionInFlight = "";
+    if (state.pageId === "autopilot") {
+      renderCurrentPage();
+    }
+  }
+}
+
+function bindAutopilotPage() {
+  if (state.pageId !== "autopilot") return;
+  document.getElementById("autopilot-robot")?.addEventListener("change", (event) => {
+    state.autopilot.robotId = event.target.value || "";
+    renderCurrentPage();
+  });
+  document.getElementById("autopilot-refresh")?.addEventListener("click", () => {
+    void loadAutopilotStatus(true);
+  });
+  document.querySelectorAll("[data-autopilot-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!button.disabled) void sendAutopilotAction(button.dataset.autopilotAction);
+    });
+  });
+  if (!state.autopilot.status && !state.autopilot.loading) {
+    void loadAutopilotStatus(true);
+  }
+  if (!state.autopilot.timer) {
+    state.autopilot.timer = window.setInterval(() => {
+      if (state.pageId === "autopilot" && canRefreshRealtimePage()) {
+        void loadAutopilotStatus(true);
+      }
+    }, AUTOPILOT_REFRESH_MS);
+  }
+}
+
 function renderLoadingPage(title, description) {
   return `
     <section class="panel">
@@ -3048,6 +3319,10 @@ function renderCurrentPage() {
   if (state.pageId !== "control" && state.control.activeTimer) {
     void sendControlStop();
   }
+  if (state.pageId !== "autopilot" && state.autopilot.timer) {
+    window.clearInterval(state.autopilot.timer);
+    state.autopilot.timer = null;
+  }
   const renderers = {
     overview: renderOverviewPage,
     status: renderStatusPage,
@@ -3056,6 +3331,7 @@ function renderCurrentPage() {
     sensors: renderSensorsPage,
     maps: renderRobotMapsPage,
     control: renderControlPage,
+    autopilot: renderAutopilotPage,
     device_management: renderDeviceManagementPage,
     users: () => renderLocalAdminPlaceholderPage("users"),
     clusters: () => renderLocalAdminPlaceholderPage("clusters"),
@@ -3725,6 +4001,7 @@ function bindForms() {
   if (state.pageId === "sensors") bindSensorsPage();
   if (state.pageId === "maps") bindRobotMapsPage();
   if (state.pageId === "control") bindControlPage();
+  if (state.pageId === "autopilot") bindAutopilotPage();
   if (state.pageId === "device_management") bindDeviceManagementPage();
 }
 
@@ -3854,6 +4131,9 @@ function handleVisibilityChange() {
     startLidarAnimation();
     void loadRobotSensorData(true);
   }
+  if (state.pageId === "autopilot") {
+    void loadAutopilotStatus(true);
+  }
 }
 
 // ===== Realtime and bootstrap =====
@@ -3867,6 +4147,10 @@ function handleDashboardSocketMessage(message) {
   }
   if (state.pageId === "sensors" && canRefreshRealtimePage()) {
     void loadRobotSensorData(true);
+    return;
+  }
+  if (state.pageId === "autopilot" && canRefreshRealtimePage()) {
+    void loadAutopilotStatus(true);
     return;
   }
   if (["overview", "status", "maintenance", "video"].includes(state.pageId) && canRefreshRealtimePage()) {

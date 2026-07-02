@@ -254,6 +254,18 @@ CREATE TABLE IF NOT EXISTS control_commands (
     completed_at  DATETIME     NULL
 ) COMMENT='统一控制命令记录';
 
+CREATE TABLE IF NOT EXISTS autonomy_events (
+    id         BIGINT      PRIMARY KEY AUTO_INCREMENT,
+    robot_id   BIGINT      NOT NULL,
+    level      VARCHAR(20) NOT NULL,
+    event_type VARCHAR(64) NOT NULL,
+    message    TEXT        NULL,
+    data_json  JSON        NULL,
+    created_at TIMESTAMP   DEFAULT CURRENT_TIMESTAMP
+) COMMENT='自动驾驶事件日志';
+
+CREATE INDEX idx_autonomy_events_robot_time ON autonomy_events (robot_id, created_at DESC);
+
 -- ------------------------------------------------------------
 -- IoT：设备传感器数据表
 -- ------------------------------------------------------------

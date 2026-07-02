@@ -33,6 +33,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.sessions import SessionMiddleware
 
 import auth as auth_helpers
+import autopilot as autopilot_helpers
 import iot as iot_helpers
 import robot_control as robot_control_helpers
 from config import (
@@ -56,6 +57,7 @@ from config import (
 from db import (
     clear_table,
     ensure_database,
+    ensure_autonomy_tables,
     ensure_iot_tables,
     ensure_management_system_tables,
     ensure_mysql_configured,
@@ -116,6 +118,12 @@ CONTROL_COMMAND_DELIVERED_STATUS = robot_control_helpers.CONTROL_COMMAND_DELIVER
 CONTROL_COMMAND_SUCCESS_STATUS = robot_control_helpers.CONTROL_COMMAND_SUCCESS_STATUS
 CONTROL_COMMAND_FAILED_STATUS = robot_control_helpers.CONTROL_COMMAND_FAILED_STATUS
 ROBOT_CONTROL_MODE = os.getenv("ROBOT_CONTROL_MODE", "direct").strip().lower() or "direct"
+AUTOPILOT_RUNTIME = autopilot_helpers.AutopilotRuntime(
+    lidar_timeout_seconds=float(os.getenv("AUTOPILOT_LIDAR_TIMEOUT_SECONDS", "10") or "10"),
+    control_timeout_seconds=float(os.getenv("AUTOPILOT_CONTROL_TIMEOUT_SECONDS", "10") or "10"),
+)
+AUTOPILOT_MODES = autopilot_helpers.AUTOPILOT_MODES
+AUTOPILOT_CONTROL_PRIORITY = autopilot_helpers.CONTROL_PRIORITY
 
 
 def mysql_ready() -> bool:
@@ -385,6 +393,9 @@ def execute_direct_robot_control(record: dict[str, Any]) -> dict[str, Any]:
     params = record.get("params") or {}
     target = load_robot_control_target(record["targetId"])
     if command_type == "cmd_vel":
+        if AUTOPILOT_RUNTIME.is_estopped():
+            raise HTTPException(status_code=423, detail="急停已触发，必须先解除急停。")
+        AUTOPILOT_RUNTIME.note_manual_override(robot_id=target.get("robotId"), source="control_command")
         linear = normalize_control_value(params.get("linear", 0.0), ROBOT_CONTROL_MAX_LINEAR, "linear")
         angular = normalize_control_value(params.get("angular", 0.0), ROBOT_CONTROL_MAX_ANGULAR, "angular")
         response = send_robot_control_command(target, {"type": "cmd_vel", "v": linear, "w": angular}, "ack", close_after=False)
@@ -468,6 +479,62 @@ def to_iso_datetime(value: Any) -> str:
     if isinstance(value, date):
         return datetime.combine(value, datetime.min.time()).isoformat(timespec="seconds")
     return str(value or "")
+
+
+def record_autonomy_event(event: dict[str, Any]) -> int | None:
+    if not mysql_ready():
+        return None
+    return execute_insert(
+        """
+        INSERT INTO autonomy_events
+            (robot_id, level, event_type, message, data_json, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """,
+        (
+            int(event.get("robotId") or 0),
+            str(event.get("level") or "info")[:20],
+            str(event.get("eventType") or "event")[:64],
+            str(event.get("message") or ""),
+            json.dumps(event.get("data") or {}, ensure_ascii=False),
+            coerce_datetime(event.get("createdAt")) or datetime.now(),
+        ),
+    )
+
+
+def load_autonomy_events(limit: int = 20, robot_id: int | None = None) -> list[dict[str, Any]]:
+    if not mysql_ready():
+        return []
+    limit = max(1, min(int(limit or 20), 100))
+    where = ""
+    params: list[Any] = []
+    if robot_id is not None:
+        where = "WHERE robot_id = %s"
+        params.append(int(robot_id))
+    rows = query_all(
+        f"""
+        SELECT id, robot_id, level, event_type, message, data_json, created_at
+        FROM autonomy_events
+        {where}
+        ORDER BY created_at DESC, id DESC
+        LIMIT {limit}
+        """,
+        tuple(params),
+    )
+    return [
+        {
+            "id": row["id"],
+            "robotId": row["robot_id"],
+            "level": row["level"],
+            "eventType": row["event_type"],
+            "message": row["message"] or "",
+            "data": json.loads(row["data_json"]) if row["data_json"] else {},
+            "createdAt": to_iso_datetime(row["created_at"]),
+        }
+        for row in rows
+    ]
+
+
+AUTOPILOT_RUNTIME.configure_persistence(record_autonomy_event, load_autonomy_events)
 
 
 def parse_datetime(value: Any, field_name: str) -> datetime:
@@ -1534,7 +1601,7 @@ def render_page(request: Request, page_id: str) -> HTMLResponse | RedirectRespon
     user = require_page_login(request)
     if isinstance(user, RedirectResponse):
         return user
-    if page_id in {"users", "clusters", "formations"} and not is_admin_user(user):
+    if page_id in {"control", "autopilot", "users", "clusters", "formations"} and not is_admin_user(user):
         return forbidden_page("仅管理员可访问当前管理页面。")
     safe_user = template_user(user)
     page = PAGES[page_id]
@@ -1576,6 +1643,10 @@ async def lifespan(_: FastAPI):
             ensure_database()
             execute_schema()
             ensure_iot_tables()
+            try:
+                ensure_autonomy_tables()
+            except Exception as exc:  # pragma: no cover - optional migration resilience
+                logger.exception("Autonomy event table migration failed: %s", exc)
             ensure_robot_ip_column()
             ensure_robot_device_column()
             ensure_management_system_tables()
@@ -1786,6 +1857,11 @@ async def control_page(request: Request):
     return render_page(request, "control")
 
 
+@app.get("/autopilot", response_class=HTMLResponse)
+async def autopilot_page(request: Request):
+    return render_page(request, "autopilot")
+
+
 @app.get("/perception", response_class=HTMLResponse)
 async def perception_page(request: Request):
     return render_page(request, "perception")
@@ -1958,6 +2034,136 @@ async def api_robot_discovery(request: Request, refresh: int = 0) -> JSONRespons
     return JSONResponse(discover_robot_candidates(force=bool(refresh)))
 
 
+def optional_robot_id_from_payload(payload: dict[str, Any]) -> int | None:
+    value = payload.get("robotId")
+    if value in (None, ""):
+        return None
+    return parse_strict_id(value, "robotId")
+
+
+def autopilot_payload_with_robot_id(payload: dict[str, Any], robot_id: int | None) -> dict[str, Any]:
+    if robot_id is None:
+        return dict(payload)
+    return {**payload, "robotId": robot_id}
+
+
+def try_autopilot_stop(payload: dict[str, Any]) -> dict[str, Any] | None:
+    try:
+        return robot_control_stop_result(payload)
+    except HTTPException as exc:
+        return {"ok": False, "statusCode": exc.status_code, "detail": exc.detail}
+
+
+def autopilot_response(status: dict[str, Any], stop_result: dict[str, Any] | None = None) -> dict[str, Any]:
+    response = {"ok": True, **status}
+    if stop_result is not None:
+        response["stopResult"] = stop_result
+    response["controlPriority"] = list(AUTOPILOT_CONTROL_PRIORITY)
+    return response
+
+
+def handle_autopilot_state_error(exc: ValueError) -> None:
+    if str(exc) == "estop_active":
+        raise HTTPException(status_code=409, detail="急停已触发，必须手动解除后才能启动或继续自动驾驶。") from exc
+    raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/autopilot/status")
+async def api_autopilot_status(limit: int = 20) -> JSONResponse:
+    return JSONResponse(autopilot_response(AUTOPILOT_RUNTIME.status(event_limit=limit)))
+
+
+@app.get("/api/autopilot/events")
+async def api_autopilot_events(request: Request, limit: int = 20, robotId: Optional[int] = None) -> JSONResponse:
+    require_api_login(request)
+    return JSONResponse({"items": AUTOPILOT_RUNTIME.events(limit, robot_id=robotId)})
+
+
+@app.post("/api/autopilot/start")
+async def api_autopilot_start(request: Request) -> JSONResponse:
+    require_admin_login(request)
+    payload = await request.json()
+    robot_id = optional_robot_id_from_payload(payload)
+    try:
+        status = AUTOPILOT_RUNTIME.start(robot_id=robot_id)
+    except ValueError as exc:
+        handle_autopilot_state_error(exc)
+    await ws_broadcast("autopilot")
+    return JSONResponse(autopilot_response(status))
+
+
+@app.post("/api/autopilot/pause")
+async def api_autopilot_pause(request: Request) -> JSONResponse:
+    require_admin_login(request)
+    payload = await request.json()
+    robot_id = optional_robot_id_from_payload(payload)
+    payload = autopilot_payload_with_robot_id(payload, robot_id)
+    status = AUTOPILOT_RUNTIME.pause(robot_id=robot_id)
+    stop_result = await run_in_threadpool(try_autopilot_stop, payload)
+    await ws_broadcast("autopilot")
+    return JSONResponse(autopilot_response(status, stop_result))
+
+
+@app.post("/api/autopilot/resume")
+async def api_autopilot_resume(request: Request) -> JSONResponse:
+    require_admin_login(request)
+    payload = await request.json()
+    robot_id = optional_robot_id_from_payload(payload)
+    try:
+        status = AUTOPILOT_RUNTIME.resume(robot_id=robot_id)
+    except ValueError as exc:
+        handle_autopilot_state_error(exc)
+    await ws_broadcast("autopilot")
+    return JSONResponse(autopilot_response(status))
+
+
+@app.post("/api/autopilot/stop")
+async def api_autopilot_stop(request: Request) -> JSONResponse:
+    require_admin_login(request)
+    payload = await request.json()
+    robot_id = optional_robot_id_from_payload(payload)
+    payload = autopilot_payload_with_robot_id(payload, robot_id)
+    status = AUTOPILOT_RUNTIME.stop(robot_id=robot_id)
+    stop_result = await run_in_threadpool(try_autopilot_stop, payload)
+    await ws_broadcast("autopilot")
+    return JSONResponse(autopilot_response(status, stop_result))
+
+
+@app.post("/api/autopilot/estop")
+async def api_autopilot_estop(request: Request) -> JSONResponse:
+    require_admin_login(request)
+    payload = await request.json()
+    robot_id = optional_robot_id_from_payload(payload)
+    payload = autopilot_payload_with_robot_id(payload, robot_id)
+    status = AUTOPILOT_RUNTIME.estop(robot_id=robot_id)
+    stop_result = await run_in_threadpool(try_autopilot_stop, payload)
+    await ws_broadcast("autopilot")
+    return JSONResponse(autopilot_response(status, stop_result))
+
+
+@app.post("/api/autopilot/clear-estop")
+async def api_autopilot_clear_estop(request: Request) -> JSONResponse:
+    require_admin_login(request)
+    payload = await request.json()
+    robot_id = optional_robot_id_from_payload(payload)
+    status = AUTOPILOT_RUNTIME.clear_estop(robot_id=robot_id)
+    await ws_broadcast("autopilot")
+    return JSONResponse(autopilot_response(status))
+
+
+@app.post("/api/iot/autopilot/status")
+async def api_iot_autopilot_status(request: Request) -> JSONResponse:
+    device_id = await run_in_threadpool(require_device_token, request)
+    payload = await request.json()
+    robot_id = payload.get("robotId")
+    if robot_id in (None, "") and mysql_ready():
+        row = await run_in_threadpool(query_one, "SELECT robot_id FROM devices WHERE id = %s LIMIT 1", (device_id,))
+        robot_id = row.get("robot_id") if row else None
+    status = AUTOPILOT_RUNTIME.update_report(payload, device_id=device_id, robot_id=robot_id)
+    await ws_broadcast("autopilot")
+    return JSONResponse({"ok": True, "status": status})
+
+
 def robot_control_status_result(robot_id: Optional[str] = None) -> dict[str, Any]:
     target = resolve_robot_control_target(robot_id)
     response = send_robot_control_command(target, {"type": "ping"}, "pong")
@@ -1967,8 +2173,11 @@ def robot_control_status_result(robot_id: Optional[str] = None) -> dict[str, Any
 
 def robot_control_cmd_vel_result(payload: dict[str, Any]) -> dict[str, Any]:
     target = resolve_robot_control_target(payload.get("robotId"))
+    if AUTOPILOT_RUNTIME.is_estopped():
+        raise HTTPException(status_code=423, detail="急停已触发，必须先解除急停。")
     linear = normalize_control_value(payload.get("linear", 0.0), ROBOT_CONTROL_MAX_LINEAR, "linear")
     angular = normalize_control_value(payload.get("angular", 0.0), ROBOT_CONTROL_MAX_ANGULAR, "angular")
+    AUTOPILOT_RUNTIME.note_manual_override(robot_id=target.get("robotId"), source="robot_control")
     if robot_control_mode() == "queue":
         command_id = insert_control_command(
             {
@@ -2000,6 +2209,8 @@ def robot_control_cmd_vel_result(payload: dict[str, Any]) -> dict[str, Any]:
 
 def robot_control_stop_result(payload: dict[str, Any]) -> dict[str, Any]:
     target = resolve_robot_control_target(payload.get("robotId"))
+    if not AUTOPILOT_RUNTIME.is_estopped():
+        AUTOPILOT_RUNTIME.note_manual_override(robot_id=target.get("robotId"), source="robot_control_stop")
     if robot_control_mode() == "queue":
         command_id = insert_control_command(
             {

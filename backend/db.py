@@ -190,6 +190,38 @@ def ensure_iot_tables() -> None:
         connection.close()
 
 
+def ensure_autonomy_tables() -> None:
+    if not mysql_configured():
+        return
+    connection = get_db()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS autonomy_events (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                    robot_id BIGINT NOT NULL,
+                    level VARCHAR(20) NOT NULL,
+                    event_type VARCHAR(64) NOT NULL,
+                    message TEXT,
+                    data_json JSON,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            cursor.execute("SHOW INDEX FROM autonomy_events WHERE Key_name = 'idx_autonomy_events_robot_time'")
+            if not cursor.fetchone():
+                cursor.execute(
+                    """
+                    CREATE INDEX idx_autonomy_events_robot_time
+                    ON autonomy_events (robot_id, created_at DESC)
+                    """
+                )
+        connection.commit()
+    finally:
+        connection.close()
+
+
 def ensure_management_system_tables() -> None:
     # Management tables are currently created by the canonical schema file.
     # Keep this hook so startup and tests can exercise the migration boundary.

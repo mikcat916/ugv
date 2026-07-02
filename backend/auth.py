@@ -179,7 +179,7 @@ def is_admin_user(user: dict[str, Any] | None) -> bool:
 def visible_pages_for_user(user: dict[str, Any] | None) -> dict[str, dict[str, str]]:
     if is_admin_user(user):
         return dict(PAGES)
-    admin_only_pages = {"control", "users", "clusters", "formations"}
+    admin_only_pages = {"control", "autopilot", "users", "clusters", "formations"}
     return {key: value for key, value in PAGES.items() if key not in admin_only_pages}
 
 
