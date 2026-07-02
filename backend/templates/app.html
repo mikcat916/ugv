@@ -27,7 +27,8 @@
       <nav class="nav-links" id="nav-links">
         {% set nav_groups = [
           ("总览", ["overview"]),
-          ("设备与机器人", ["status", "video", "perception", "sensors", "maps", "control", "device_management", "devices"])
+          ("设备与机器人", ["status", "video", "perception", "sensors", "maps", "control", "device_management", "devices"]),
+          ("本地管理", ["users", "clusters", "formations"])
         ] %}
         {% for group_title, group_keys in nav_groups %}
         {% set group = namespace(has_visible=false) %}
@@ -123,6 +124,9 @@
     };
   </script>
   {{ amap_script|safe }}
+  <script src="/static/api.js?v={{ asset_version }}" defer></script>
+  <script src="/static/ui.js?v={{ asset_version }}" defer></script>
+  <script src="/static/websocket.js?v={{ asset_version }}" defer></script>
   <script src="/static/dashboard.js?v={{ asset_version }}" defer></script>
 </body>
 </html>

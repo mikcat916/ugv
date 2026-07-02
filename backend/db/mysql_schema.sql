@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS robots (
     id         BIGINT         PRIMARY KEY AUTO_INCREMENT,
     model      VARCHAR(128)   NOT NULL,
     ip_address VARCHAR(64)    NULL,
+    device_id  BIGINT         NULL COMMENT '主关联设备 ID',
     status     VARCHAR(32)    NOT NULL,
     health     INT            NOT NULL,
     battery    INT            NOT NULL,
@@ -55,8 +56,11 @@ CREATE TABLE IF NOT EXISTS robots (
     lng        DECIMAL(12,6)  NOT NULL,
     lat        DECIMAL(12,6)  NOT NULL,
     heading    INT            NOT NULL,
-    created_at DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_robots_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE SET NULL
 ) COMMENT='巡检机器人';
+
+CREATE INDEX idx_robots_device ON robots (device_id);
 
 -- ------------------------------------------------------------
 -- 任务表
@@ -138,6 +142,7 @@ CREATE TABLE IF NOT EXISTS device_telemetry (
     status      VARCHAR(32)    NULL                       COMMENT '状态 online|offline|fault',
     lat         DECIMAL(10,7)  NULL                       COMMENT '纬度',
     lng         DECIMAL(10,7)  NULL                       COMMENT '经度',
+    source_ip   VARCHAR(64)    NULL                       COMMENT '上报来源 IP',
     extra_json  JSON           NULL                       COMMENT '附加信息',
     reported_at DATETIME       NOT NULL                   COMMENT '上报时间',
     created_at  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -268,3 +273,4 @@ CREATE TABLE IF NOT EXISTS device_sensor_data (
 ) COMMENT='设备传感器数据';
 
 CREATE INDEX idx_sensor_device_time ON device_sensor_data (device_id, sensor_type, reported_at DESC);
+CREATE INDEX idx_sensor_device_type_channel_time ON device_sensor_data (device_id, sensor_type, channel, reported_at DESC);

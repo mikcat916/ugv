@@ -8,7 +8,7 @@
 - Session 登录认证
 - MySQL 自动建库、建表和管理员初始化
 - 总览、任务、报告、机器人、维护、区域等页面
-- 用户、设备、区域、点位、路线管理
+- 用户、设备体系、机器人、地图、传感器和远程控制管理
 - REST API 与 WebSocket 实时更新
 - 高德地图接入与浏览器定位
 - 区域地图点选绘制
@@ -31,8 +31,11 @@ backend/
 |-- db/
 |   `-- mysql_schema.sql
 |-- static/
+|   |-- api.js
 |   |-- dashboard.css
 |   |-- dashboard.js
+|   |-- ui.js
+|   |-- websocket.js
 |   `-- login.js
 |-- templates/
 |   |-- app.html
@@ -40,8 +43,13 @@ backend/
 |-- tests/
 |   |-- test_auth_ui.py
 |   `-- test_robot_discovery.py
-|-- .env
-|-- main.py
+|-- config.py
+|-- auth.py
+|-- app_core.py
+|-- db.py
+|-- iot.py
+|-- main.py              # uvicorn main:app 兼容入口
+|-- robot_control.py
 |-- requirements.txt
 `-- README.md
 ```
@@ -143,25 +151,20 @@ mysql -u root -p robot_monitor < db\seed-dev.sql
 ## 页面路由
 
 - `/overview`：总览
-- `/tasks`：任务管理
-- `/reports`：历史报告
 - `/robots`：机器人状态
-- `/maintenance`：设备维护
-- `/zones`：区域控制
-- `/users`：用户管理
-- `/devices`：设备管理
-- `/areas`：巡检区域
-- `/points`：巡检点
-- `/routes`：巡检路线
+- `/video`：实时画面
+- `/perception`：智能感知
+- `/sensors`：传感器数据
+- `/maps`：地图展示
+- `/control`：远程遥控
+- `/device-management`：设备体系管理
+- `/devices`：旧设备页
 - `/login`：登录页
 
 兼容旧路由：
 
 - `/` -> `/overview`
-- `/_3` -> `/tasks`
-- `/_1` -> `/reports`
 - `/monitoring_dashboard` -> `/robots`
-- `/zone_control` -> `/zones`
 
 ## API 概览
 
@@ -179,20 +182,12 @@ mysql -u root -p robot_monitor < db\seed-dev.sql
 
 ### 业务对象
 
-- `GET /api/tasks`
-- `POST /api/tasks`
-- `DELETE /api/tasks/{task_id}`
 - `GET /api/robots`
 - `POST /api/robots`
 - `DELETE /api/robots/{robot_id}`
 - `GET /api/alerts`
 - `POST /api/alerts`
 - `DELETE /api/alerts/{alert_id}`
-- `GET /api/reports`
-- `POST /api/reports`
-- `DELETE /api/reports/{report_id}`
-- `GET /api/zones`
-- `POST /api/zones`
 
 ### 管理页
 
@@ -204,20 +199,18 @@ mysql -u root -p robot_monitor < db\seed-dev.sql
 - `POST /api/devices`
 - `PUT /api/devices/{device_id}`
 - `DELETE /api/devices/{device_id}`
-- `GET /api/areas`
-- `POST /api/areas`
-- `PUT /api/areas/{area_id}`
-- `DELETE /api/areas/{area_id}`
-- `GET /api/points`
-- `POST /api/points`
-- `PUT /api/points/{point_id}`
-- `DELETE /api/points/{point_id}`
-- `GET /api/routes`
-- `POST /api/routes`
-- `PUT /api/routes/{route_id}`
-- `DELETE /api/routes/{route_id}`
-- `GET /api/routes/{route_id}/points`
-- `PUT /api/routes/{route_id}/points`
+- `GET /api/device-categories`
+- `POST /api/device-categories`
+- `PUT /api/device-categories/{category_id}`
+- `DELETE /api/device-categories/{category_id}`
+- `GET /api/onboard-units`
+- `POST /api/onboard-units`
+- `PUT /api/onboard-units/{unit_id}`
+- `DELETE /api/onboard-units/{unit_id}`
+- `GET /api/network-channels`
+- `POST /api/network-channels`
+- `PUT /api/network-channels/{channel_id}`
+- `DELETE /api/network-channels/{channel_id}`
 
 ## 登录与权限
 
@@ -225,6 +218,7 @@ mysql -u root -p robot_monitor < db\seed-dev.sql
 - 未登录访问业务页面会重定向到 `/login`。
 - 未登录访问业务 API 会返回 `401`。
 - WebSocket `/ws/dashboard` 同样要求登录状态。
+- `/control`、`/users`、`/clusters`、`/formations` 仅管理员可访问。
 - 当 `ALLOW_SELF_REGISTER=0` 时，登录页不会显示注册入口。
 
 ## 区域绘制说明
@@ -273,15 +267,23 @@ mysql -u root -p robot_monitor < db\seed-dev.sql
 - 首次连接推送仪表盘快照
 - `ping` / `heartbeat`
 - `refresh`
-- 任务、机器人、告警、报告、区域变更后的广播刷新
+- 机器人、告警、IoT 遥测、传感器和设备管理变更后的广播刷新
 
 ## 测试
 
 运行核心测试：
 
 ```powershell
-cd E:\Code\Project4\backend
-python -m pytest -q tests/test_auth_ui.py tests/test_robot_discovery.py tests/test_iot_auth.py tests/test_schema_migration.py
+cd E:\Code\Project4
+python -m pytest backend\tests -q
+```
+
+Web 本地发布验收：
+
+```powershell
+python scripts\local_release_smoke.py --static
+# 启动后端后
+python scripts\local_release_smoke.py --web --backend-url http://127.0.0.1:8000
 ```
 
 当前重点覆盖：
@@ -322,6 +324,21 @@ python -m pytest -q tests/test_auth_ui.py tests/test_robot_discovery.py tests/te
 - `MYSQL_USER`
 - `MYSQL_PASSWORD`
 - `MYSQL_DATABASE`
+
+### 4. 端口被占用
+
+默认端口是 `8000`。本地临时换端口：
+
+```powershell
+cd E:\Code\Project4
+.\start-dev.ps1 -Port 8001
+```
+
+也可以在根目录 `.env` 中设置：
+
+```env
+BACKEND_PORT=8001
+```
 
 ## 开发入口
 

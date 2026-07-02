@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-import main as app_module
+import app_core as app_module
 
 
 def test_load_robots_prefers_latest_telemetry_snapshot(monkeypatch):
@@ -44,7 +44,7 @@ def test_load_robots_prefers_latest_telemetry_snapshot(monkeypatch):
     assert robot["location"] == [121.818765, 31.092345]
     assert robot["networkStatus"] == "warning"
     assert robot["isRealtime"] is True
-    assert robot["lastSeenAt"] == reported_at.isoformat(timespec="minutes")
+    assert robot["lastSeenAt"] == reported_at.isoformat(timespec="seconds")
 
 
 def test_build_maintenance_items_uses_network_status():

@@ -444,6 +444,28 @@ def _post_sensor_data(config: BridgeConfig, payload: dict[str, Any]) -> dict[str
         return json.loads(response.read().decode("utf-8"))
 
 
+def lidar_reported_at(scan: dict[str, Any]) -> str:
+    stamp = scan.get("timestamp")
+    if isinstance(stamp, (int, float)) and math.isfinite(float(stamp)) and float(stamp) > 0:
+        return datetime.fromtimestamp(float(stamp)).isoformat(timespec="seconds")
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def build_lidar_payload(config: BridgeConfig, scan: dict[str, Any]) -> dict[str, Any]:
+    upload_time = datetime.now().isoformat(timespec="seconds")
+    return {
+        "sensorType": "lidar",
+        "channel": "scan",
+        "data": scan,
+        "reportedAt": lidar_reported_at(scan),
+        "extra": {
+            "sourceTopic": config.lidar_topic,
+            "uploadTime": upload_time,
+            "rangeStride": scan.get("rangeStride"),
+        },
+    }
+
+
 def camera_upload_loop(config: BridgeConfig, state: TelemetryState) -> None:
     """Periodically upload camera snapshots."""
     while not rospy.is_shutdown():
@@ -485,12 +507,7 @@ def lidar_upload_loop(config: BridgeConfig, state: TelemetryState) -> None:
         with state.lock:
             scan = state.lidar_scan
         if scan:
-            payload = {
-                "sensorType": "lidar",
-                "channel": "scan",
-                "data": scan,
-                "reportedAt": datetime.now().isoformat(timespec="seconds"),
-            }
+            payload = build_lidar_payload(config, scan)
             try:
                 result = _post_sensor_data(config, payload)
                 rospy.loginfo("lidar scan uploaded: %s beams, ok=%s", scan.get("validBeams"), result.get("ok"))

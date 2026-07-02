@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-import main as app_module
+import app_core as app_module
 
 
 def mock_startup(monkeypatch):
@@ -9,6 +9,7 @@ def mock_startup(monkeypatch):
     monkeypatch.setattr(app_module, "execute_schema", lambda: None)
     monkeypatch.setattr(app_module, "ensure_iot_tables", lambda: None)
     monkeypatch.setattr(app_module, "ensure_robot_ip_column", lambda: None)
+    monkeypatch.setattr(app_module, "ensure_robot_device_column", lambda: None)
     monkeypatch.setattr(app_module, "ensure_management_system_tables", lambda: None)
     monkeypatch.setattr(app_module, "ensure_admin_user", lambda: None)
 

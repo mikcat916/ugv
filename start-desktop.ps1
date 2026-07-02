@@ -36,12 +36,19 @@ if (Test-Path $EnvFile) {
 }
 
 if (-not $BackendUrl) {
+    $BackendUrl = [Environment]::GetEnvironmentVariable("UGV_BACKEND_URL", "Process")
+}
+if (-not $BackendUrl) {
+    $BackendUrl = [Environment]::GetEnvironmentVariable("BACKEND_URL", "Process")
+}
+if (-not $BackendUrl) {
     $hostValue = [Environment]::GetEnvironmentVariable("BACKEND_HOST", "Process")
     if (-not $hostValue) { $hostValue = "127.0.0.1" }
     $portValue = [Environment]::GetEnvironmentVariable("BACKEND_PORT", "Process")
     if (-not $portValue) { $portValue = "8000" }
     $BackendUrl = "http://${hostValue}:$portValue"
 }
+[Environment]::SetEnvironmentVariable("UGV_BACKEND_URL", $BackendUrl.TrimEnd("/"), "Process")
 
 $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
 if (-not $pythonCmd) {

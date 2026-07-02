@@ -4,12 +4,13 @@ from __future__ import annotations
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSignal, QPropertyAnimation, QEasingCurve, QPoint, Qt, QTimer, QEvent, QSize
 from PyQt5.QtCore import QSequentialAnimationGroup
-from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QWidget, QMessageBox
 from PyQt5.QtGui import QIcon
 from qfluentwidgets import ThemeColor, TransparentToolButton
 from qfluentwidgets import FluentIcon as FIF
 
 try:
+    from .backend_config import backend_url, check_backend_health
     from .UiLoader import resource_path
     from UI.generated.login import Ui_Form
 except ImportError:
@@ -17,6 +18,7 @@ except ImportError:
     from pathlib import Path
 
     sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from app.backend_config import backend_url, check_backend_health
     from app.UiLoader import resource_path
     from UI.generated.login import Ui_Form
 
@@ -54,10 +56,14 @@ class LoginPage(QWidget):
         self.password = ""
         self._pending_login = False
         self._login_delay_ms = 450
+        self.backend_url = backend_url()
+        self.backend_status_label = None
+        self.backend_reconnect_button = None
 
         # ===== UI 初始化 =====
         self.apply_fluent_dot_style()
         self.setup_window_controls()
+        self.setup_backend_status()
 
         if USE_FLUENT_BUTTONS:
             for i in range(10):
@@ -83,6 +89,7 @@ class LoginPage(QWidget):
             back_btn.clicked.connect(self.on_backspace)
 
         self.update_dots()
+        QTimer.singleShot(200, lambda: self.check_backend_connection(show_dialog=True))
 
         if self.is_complete():
             if self.verify():
@@ -137,6 +144,57 @@ class LoginPage(QWidget):
 
     def _emit_login(self):
         self.login_success.emit()
+
+    def setup_backend_status(self) -> None:
+        layout = getattr(self.ui, "verticalLayout_2", None)
+        if layout is None:
+            return
+
+        panel = QtWidgets.QFrame(self)
+        panel.setObjectName("backendStatusPanel")
+        panel.setStyleSheet(
+            "QFrame#backendStatusPanel {"
+            "background: rgba(255, 255, 255, 170);"
+            "border: 1px solid rgba(11, 74, 168, 38);"
+            "border-radius: 10px;"
+            "}"
+            "QLabel#backendStatusLabel { color: #0b1a3a; font-size: 12px; }"
+        )
+        row = QtWidgets.QHBoxLayout(panel)
+        row.setContentsMargins(10, 6, 10, 6)
+        row.setSpacing(8)
+
+        self.backend_status_label = QtWidgets.QLabel(f"后端：{self.backend_url}，检查中...", panel)
+        self.backend_status_label.setObjectName("backendStatusLabel")
+        self.backend_status_label.setWordWrap(True)
+        row.addWidget(self.backend_status_label, 1)
+
+        button_cls = PushButton if USE_FLUENT_BUTTONS else QtWidgets.QPushButton
+        self.backend_reconnect_button = button_cls("重新连接", panel)
+        self.backend_reconnect_button.setFixedHeight(30)
+        self.backend_reconnect_button.clicked.connect(lambda: self.check_backend_connection(show_dialog=True))
+        row.addWidget(self.backend_reconnect_button)
+
+        layout.insertWidget(1, panel)
+
+    def check_backend_connection(self, show_dialog: bool = False) -> bool:
+        if self.backend_reconnect_button:
+            self.backend_reconnect_button.setEnabled(False)
+        result = check_backend_health(self.backend_url)
+        ok = bool(result.get("ok"))
+        if self.backend_status_label:
+            if ok:
+                mysql_text = "数据库在线" if result.get("mysqlReady") else "数据库未就绪"
+                self.backend_status_label.setText(f"后端：{result['url']}，已连接，{mysql_text}")
+                self.backend_status_label.setStyleSheet("color: #087f5b; font-size: 12px;")
+            else:
+                self.backend_status_label.setText(f"后端：{result['url']}，连接失败：{result.get('message')}")
+                self.backend_status_label.setStyleSheet("color: #b42318; font-size: 12px;")
+        if self.backend_reconnect_button:
+            self.backend_reconnect_button.setEnabled(True)
+        if show_dialog and not ok:
+            QMessageBox.warning(self, "后端连接失败", f"无法连接后端：\n{result['url']}\n\n原因：{result.get('message')}")
+        return ok
 
     def _set_inputs_enabled(self, enabled: bool) -> None:
         for i in range(10):

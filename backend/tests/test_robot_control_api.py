@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-import main as app_module
+import app_core as app_module
 
 
 def fake_admin():
@@ -36,6 +36,7 @@ def mock_auth(monkeypatch):
     monkeypatch.setattr(app_module, "execute_schema", lambda: None)
     monkeypatch.setattr(app_module, "ensure_iot_tables", lambda: None)
     monkeypatch.setattr(app_module, "ensure_robot_ip_column", lambda: None)
+    monkeypatch.setattr(app_module, "ensure_robot_device_column", lambda: None)
     monkeypatch.setattr(app_module, "ensure_management_system_tables", lambda: None)
     monkeypatch.setattr(app_module, "ensure_admin_user", lambda: None)
     monkeypatch.setattr(app_module, "get_user_by_username", lambda username: fake_admin())
@@ -233,6 +234,52 @@ def test_control_reconnects_when_cached_socket_is_stale(monkeypatch):
 
     assert response == {"type": "pong", "ok": True}
     assert stale_socket.closed is True
+    assert fresh_socket.payload == b'{"type":"ping"}\n'
+
+
+def test_control_retries_when_cached_socket_closes_during_read(monkeypatch):
+    target = {"host": "192.168.31.198", "port": 9000}
+    key = app_module.robot_control_target_key(target)
+
+    class ClosingSocket:
+        closed = False
+        payload = b""
+
+        def sendall(self, payload):
+            self.payload = payload
+
+        def recv(self, size):
+            return b""
+
+        def close(self):
+            self.closed = True
+
+    class FreshSocket:
+        closed = False
+        payload = b""
+
+        def settimeout(self, timeout):
+            self.timeout = timeout
+
+        def sendall(self, payload):
+            self.payload = payload
+
+        def recv(self, size):
+            return b'{"type":"pong","ok":true}\n'
+
+        def close(self):
+            self.closed = True
+
+    closing_socket = ClosingSocket()
+    fresh_socket = FreshSocket()
+    app_module.ROBOT_CONTROL_STATE["connections"][key] = {"socket": closing_socket, "buffer": b""}
+    monkeypatch.setattr(app_module.socket, "create_connection", lambda address, timeout: fresh_socket)
+
+    response = app_module.send_robot_control_message(target, {"type": "ping"}, "pong")
+
+    assert response == {"type": "pong", "ok": True}
+    assert closing_socket.payload == b'{"type":"ping"}\n'
+    assert closing_socket.closed is True
     assert fresh_socket.payload == b'{"type":"ping"}\n'
 
 

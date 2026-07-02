@@ -1,4 +1,7 @@
 const appConfig = window.APP_CONFIG || {};
+const { apiFetch } = window.DashboardApi;
+const { escapeHtml, formatDateTime, localizeToken, pillClass } = window.DashboardUi;
+const dashboardRealtime = window.DashboardRealtime;
 const pageContent = document.getElementById("page-content");
 const logoutButton = document.getElementById("logout-button");
 const generatedAt = document.getElementById("generated-at");
@@ -198,24 +201,10 @@ const MANAGEMENT_PAGE_CONFIG = {
       network: { filterKey: "networkChannels", pagingKey: "networkChannels" },
     },
   },
-};function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
+};
+window.DashboardTokenText = TOKEN_TEXT;
 
-function formatDateTime(value) {
-  if (!value) return "-";
-  return value.replace("T", " ");
-}
-
-function localizeToken(value) {
-  const token = String(value || "").toLowerCase();
-  return TOKEN_TEXT[token] || String(value || "-");
-}
+// ===== Dashboard state and domain helpers =====
 
 function siteCenter() {
   const center = state.data?.site?.center;
@@ -325,36 +314,6 @@ function applyFriendlyFormDefaults(formName, form) {
   });
 }
 
-function pillClass(value) {
-  const token = String(value || "").toLowerCase();
-  if (["critical", "offline", "danger"].includes(token)) return "pill critical";
-  if (["warning", "degraded", "medium"].includes(token)) return "pill warning";
-  if (["active", "healthy", "online", "good", "low", "positive"].includes(token)) return "pill healthy";
-  return "pill";
-}
-
-async function apiFetch(url, options = {}) {
-  const response = await fetch(url, {
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options,
-  });
-
-  if (response.status === 401) {
-    window.location.href = "/login";
-    throw new Error("登录状态已失效，请重新登录。");
-  }
-
-  const isJson = response.headers.get("content-type")?.includes("application/json");
-  const payload = isJson ? await response.json() : null;
-
-  if (!response.ok) {
-    throw new Error(payload?.detail || `请求失败：${response.status}`);
-  }
-
-  return payload;
-}
-
 async function loadDashboard() {
   const payload = await apiFetch("/api/dashboard");
   state.data = payload.data;
@@ -362,6 +321,7 @@ async function loadDashboard() {
   renderCurrentPage();
 }
 
+// ===== Shell metadata and location =====
 function renderShellMeta() {
   if (!state.data) return;
   siteName.textContent = state.data.site.name;
@@ -546,6 +506,7 @@ function startLocationWatch() {
   );
 }
 
+// ===== Page renderers =====
 function renderOverviewPage() {
   const robots = state.data.robots.slice(0, 4);
   return `
@@ -1089,7 +1050,12 @@ function sensorIsStale(item) {
   if (item.stale === false) return false;
   const reportedAt = Date.parse(item.reportedAt || "");
   if (!Number.isFinite(reportedAt)) return false;
-  const staleAfterSeconds = Number(state.sensors.data?.staleAfterSeconds || SENSOR_STALE_FALLBACK_SECONDS);
+  const staleAfterSeconds = Number(
+    item.staleAfterSeconds
+    || state.sensors.data?.staleAfterSecondsByType?.[item.sensorType]
+    || state.sensors.data?.staleAfterSeconds
+    || SENSOR_STALE_FALLBACK_SECONDS,
+  );
   return (Date.now() - reportedAt) / 1000 > staleAfterSeconds;
 }
 
@@ -1122,6 +1088,7 @@ function sensorItemKey(item, fallback = "sensor") {
   ].join(":");
 }
 
+// ===== Sensor and LiDAR rendering =====
 function renderSensorImageCard(item, fallbackChannel) {
   const key = sensorItemKey(item, fallbackChannel);
   const label = sensorChannelLabel(item, fallbackChannel);
@@ -1160,16 +1127,61 @@ function renderCameraEmptyState(data) {
   return `<div class="empty-state">${staleSensorCount(data, "camera") ? "单目摄像头已离线，等待新帧。" : "暂无单目摄像头数据。"}</div>`;
 }
 
+function formatMeters(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? `${(Math.round(numeric * 100) / 100).toFixed(2)} m` : "-";
+}
+
+function lidarNearestDistance(data) {
+  const points = scanPoints(data, 1);
+  if (!points.length) {
+    const fallback = Number(data?.minRange);
+    return Number.isFinite(fallback) && fallback > 0 ? fallback : null;
+  }
+  return points.reduce((min, point) => Math.min(min, point.dist), Infinity);
+}
+
+function lidarSectorDistance(data, minDeg, maxDeg) {
+  const points = scanPoints(data, 1).filter((point) => {
+    const deg = ((point.angle * 180 / Math.PI) % 360 + 360) % 360;
+    return deg >= minDeg && deg <= maxDeg;
+  });
+  return points.length ? points.reduce((min, point) => Math.min(min, point.dist), Infinity) : null;
+}
+
+function latestLidarItem() {
+  return lidarItems(state.sensors.data)[0] || null;
+}
+
+function latestLidarDebugPayload() {
+  const item = latestLidarItem();
+  if (!item) return null;
+  return {
+    robotId: state.sensors.data?.robotId ?? state.sensors.robotId ?? null,
+    deviceId: state.sensors.data?.deviceId ?? null,
+    deviceMatchSource: state.sensors.data?.deviceMatchSource || "",
+    sensor: item,
+  };
+}
+
 function renderLidarInfo(data) {
   const lidars = lidarItems(data);
   const lidarData = lidars.length ? lidars[0].data : null;
   const displayRange = lidarData ? Math.round(lidarFrameDisplayRange(lidarData) * 10) / 10 : null;
+  const nearest = lidarData ? lidarNearestDistance(lidarData) : null;
+  const rightFront = lidarData ? lidarSectorDistance(lidarData, 0, 60) : null;
+  const front = lidarData ? lidarSectorDistance(lidarData, 60, 120) : null;
+  const leftFront = lidarData ? lidarSectorDistance(lidarData, 120, 180) : null;
   return lidarData ? `
     <div class="metric-grid">
       <div class="metric-card"><strong>${escapeHtml(lidarData.numBeams ?? "-")}</strong><span>扫描光束数</span></div>
       <div class="metric-card"><strong>${escapeHtml(lidarData.renderedBeams ?? (lidarData.ranges || []).length ?? "-")}</strong><span>显示点数</span></div>
       <div class="metric-card"><strong>${escapeHtml(lidarData.validBeams ?? "-")}</strong><span>有效光束数</span></div>
-      <div class="metric-card"><strong>${escapeHtml(lidarData.minRange ?? "-")} m</strong><span>最近距离</span></div>
+      <div class="metric-card"><strong>${escapeHtml(formatMeters(nearest))}</strong><span>最近障碍物距离</span></div>
+      <div class="metric-card"><strong>${escapeHtml(formatMeters(leftFront))}</strong><span>左前最小距离</span></div>
+      <div class="metric-card"><strong>${escapeHtml(formatMeters(front))}</strong><span>正前最小距离</span></div>
+      <div class="metric-card"><strong>${escapeHtml(formatMeters(rightFront))}</strong><span>右前最小距离</span></div>
+      <div class="metric-card"><strong>${escapeHtml(formatMeters(lidarData.minRange))}</strong><span>全局最近距离</span></div>
       <div class="metric-card"><strong>${escapeHtml(lidarData.maxRange ?? "-")} m</strong><span>最远距离</span></div>
       <div class="metric-card"><strong>${escapeHtml(lidarData.meanRange ?? "-")} m</strong><span>平均距离</span></div>
       <div class="metric-card"><strong>${escapeHtml(displayRange ?? "-")} m</strong><span>显示范围</span></div>
@@ -1267,6 +1279,7 @@ function updateSensorsDom() {
   updateSensorImageGrid("sensor-stereo-grid", stereoItems(data), renderStereoEmptyState(data), "stereo");
   updateSensorImageGrid("sensor-camera-grid", cameraItems(data), renderCameraEmptyState(data), "camera");
   replaceHtmlIfChanged(document.getElementById("sensor-lidar-metrics"), renderLidarInfo(data));
+  updateLidarActionButtons();
   const latestLidar = lidarItems(data)[0];
   if (latestLidar) {
     rememberLidarFrame(latestLidar);
@@ -1274,9 +1287,68 @@ function updateSensorsDom() {
     state.sensors.lidarTrail = [];
     state.sensors.lidarLastFrameKey = "";
   }
-  if (!state.sensors.lidarAnimationId && document.getElementById("lidar-canvas")) {
+  if (!document.hidden && !state.sensors.lidarAnimationId && document.getElementById("lidar-canvas")) {
     startLidarAnimation();
   }
+}
+
+function updateLidarActionButtons() {
+  const hasLidar = Boolean(latestLidarItem());
+  const copyButton = document.getElementById("lidar-copy-json");
+  const downloadButton = document.getElementById("lidar-download-json");
+  if (copyButton) copyButton.disabled = !hasLidar;
+  if (downloadButton) downloadButton.disabled = !hasLidar;
+}
+
+function latestLidarJsonText() {
+  const payload = latestLidarDebugPayload();
+  return payload ? JSON.stringify(payload, null, 2) : "";
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
+}
+
+async function copyLatestLidarJson() {
+  const button = document.getElementById("lidar-copy-json");
+  const text = latestLidarJsonText();
+  if (!text) return;
+  await copyTextToClipboard(text);
+  if (button) {
+    const original = button.textContent;
+    button.textContent = "已复制";
+    window.setTimeout(() => {
+      button.textContent = original || "复制 JSON";
+    }, 1200);
+  }
+}
+
+function downloadLatestLidarJson() {
+  const text = latestLidarJsonText();
+  if (!text) return;
+  const robotId = String(state.sensors.data?.robotId || state.sensors.robotId || "unknown").replace(/[^\w.-]+/g, "_");
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `lidar-${robotId}-${stamp}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function lidarFrameKey(item) {
@@ -1322,9 +1394,10 @@ function stopLidarAnimation() {
 
 function startLidarAnimation() {
   if (state.sensors.lidarAnimationId) return;
+  if (document.hidden) return;
   stopLidarAnimation();
   const tick = (now) => {
-    if (state.pageId !== "sensors") {
+    if (state.pageId !== "sensors" || document.hidden) {
       stopLidarAnimation();
       return;
     }
@@ -1386,11 +1459,25 @@ function lidarDisplayMax(frames) {
   return Math.max(4, Math.ceil(maxRange));
 }
 
+function prepareLidarCanvas(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const cssWidth = Math.max(1, Math.round(rect.width || canvas.clientWidth || 560));
+  const cssHeight = Math.max(1, Math.round(rect.height || canvas.clientHeight || cssWidth));
+  const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
+  const pixelWidth = Math.round(cssWidth * dpr);
+  const pixelHeight = Math.round(cssHeight * dpr);
+  if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+    canvas.width = pixelWidth;
+    canvas.height = pixelHeight;
+  }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: cssWidth, h: cssHeight };
+}
+
 function drawLidarCanvas(canvas, frames, now = performance.now()) {
   if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const w = canvas.width;
-  const h = canvas.height;
+  const { ctx, w, h } = prepareLidarCanvas(canvas);
   const cx = w / 2;
   const cy = h / 2;
   const padding = 42;
@@ -1643,6 +1730,7 @@ function renderSensorsPage() {
   const stereoCards = renderSensorImageCards(stereo, renderStereoEmptyState(data), "stereo");
   const cameraCards = renderSensorImageCards(cams, renderCameraEmptyState(data), "camera");
   const lidarInfo = renderLidarInfo(data);
+  const hasLidar = Boolean(lidarItems(data)[0]);
 
   return `
     <section class="panel sensor-console">
@@ -1687,6 +1775,10 @@ function renderSensorsPage() {
           <h3>雷达扫描 (LiDAR)</h3>
           <p class="muted">RViz 风格 2D 极坐标可视化，距离远近以颜色渐变显示（近红远蓝），含扫描拖尾效果。</p>
         </div>
+        <div class="button-row">
+          <button class="secondary-button" id="lidar-copy-json" type="button"${hasLidar ? "" : " disabled"}>复制 JSON</button>
+          <button class="secondary-button" id="lidar-download-json" type="button"${hasLidar ? "" : " disabled"}>下载 JSON</button>
+        </div>
       </div>
       <div class="sensor-lidar-layout">
         <div class="sensor-lidar-canvas-wrap">
@@ -1711,6 +1803,12 @@ function bindSensorsPage() {
   document.getElementById("sensor-refresh")?.addEventListener("click", () => {
     void loadRobotSensorData(true);
   });
+  document.getElementById("lidar-copy-json")?.addEventListener("click", () => {
+    void copyLatestLidarJson();
+  });
+  document.getElementById("lidar-download-json")?.addEventListener("click", () => {
+    downloadLatestLidarJson();
+  });
   rememberLidarFrame(lidarItems(state.sensors.data)[0]);
   startLidarAnimation();
   // Auto load on first visit
@@ -1725,6 +1823,7 @@ function bindSensorsPage() {
       }
     }, LIDAR_REFRESH_MS);
   }
+  updateLidarActionButtons();
 }
 
 /* ─── 车载地图页 ──────────────────────────────────────────── */
@@ -1741,6 +1840,7 @@ function ensureRobotMapSelection() {
   return next;
 }
 
+// ===== Robot map loading and rendering =====
 async function loadRobotMaps(force = false) {
   if (state.robotMaps.loading) return;
   if (!force && state.robotMaps.items.length) return;
@@ -1938,6 +2038,7 @@ function bindRobotMapsPage() {
   }
 }
 
+// ===== Remote control page =====
 function renderControlPage() {
   const control = appConfig.robotControl || {};
   const selectedRobot = resolveControlRobot();
@@ -2817,6 +2918,43 @@ function renderDeviceManagementPage() {
   `;
 }
 
+function renderLocalAdminPlaceholderPage(kind) {
+  const copy = {
+    users: {
+      title: "用户管理",
+      description: "本地管理员账号入口已接入，完整账号增删改能力通过后端 API 保留。",
+      primary: "默认管理员",
+      secondary: appConfig.currentUser?.username || "admin",
+    },
+    clusters: {
+      title: "集群管理",
+      description: "集群导航入口已接入，当前仅用于本地验收和后续节点管理扩展。",
+      primary: "节点保护",
+      secondary: "删除/迁移已有后端约束",
+    },
+    formations: {
+      title: "编队管理",
+      description: "编队导航入口已接入，当前仅用于本地验收和后续队形方案扩展。",
+      primary: "编队保护",
+      secondary: "成员归属已有后端约束",
+    },
+  }[kind];
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>${escapeHtml(copy.title)}</h2>
+          <p class="muted">${escapeHtml(copy.description)}</p>
+        </div>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-card"><strong>${escapeHtml(copy.primary)}</strong><span>入口状态</span></div>
+        <div class="metric-card"><strong>${escapeHtml(copy.secondary)}</strong><span>本地验收</span></div>
+      </div>
+    </section>
+  `;
+}
+
 function renderDeviceCategoriesPanel(data) {
   const rows = (data.categories.items || []).map((item) => `
     <tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(localizeToken(item.status))}</td><td>${escapeHtml(item.description || "-")}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td>
@@ -2895,6 +3033,7 @@ function renderTable(type, headers, rows) {
   ` : `<div class="empty-state">暂无记录。</div>`;
 }
 
+// ===== Page orchestration =====
 function renderCurrentPage() {
   if (state.pageId !== "video") {
     clearVideoSnapshotTimer();
@@ -2918,6 +3057,9 @@ function renderCurrentPage() {
     maps: renderRobotMapsPage,
     control: renderControlPage,
     device_management: renderDeviceManagementPage,
+    users: () => renderLocalAdminPlaceholderPage("users"),
+    clusters: () => renderLocalAdminPlaceholderPage("clusters"),
+    formations: () => renderLocalAdminPlaceholderPage("formations"),
     devices: renderDevicesPage,
   };
   const renderer = renderers[state.pageId];
@@ -2926,6 +3068,7 @@ function renderCurrentPage() {
   renderMaps();
 }
 
+// ===== Form binding and page events =====
 function formToObject(form) {
   const data = Object.fromEntries(new FormData(form).entries());
   for (const key of Object.keys(data)) {
@@ -3696,10 +3839,24 @@ async function renderMaps() {
 }
 
 function canRefreshRealtimePage() {
+  if (document.hidden) return false;
   const active = document.activeElement;
   return !(active && (active.closest("form") || active.closest("dialog")));
 }
 
+function handleVisibilityChange() {
+  if (document.hidden) {
+    stopLidarAnimation();
+    return;
+  }
+  if (state.pageId === "sensors") {
+    rememberLidarFrame(lidarItems(state.sensors.data)[0]);
+    startLidarAnimation();
+    void loadRobotSensorData(true);
+  }
+}
+
+// ===== Realtime and bootstrap =====
 function handleDashboardSocketMessage(message) {
   if (!message || message.type !== "dashboard_update" || !message.data) return;
   state.data = message.data;
@@ -3722,65 +3879,11 @@ function handleDashboardSocketMessage(message) {
 }
 
 function clearRealtimeTimers() {
-  if (state.realtime.heartbeatTimer) {
-    window.clearInterval(state.realtime.heartbeatTimer);
-    state.realtime.heartbeatTimer = null;
-  }
-  if (state.realtime.reconnectTimer) {
-    window.clearTimeout(state.realtime.reconnectTimer);
-    state.realtime.reconnectTimer = null;
-  }
-}
-
-function scheduleDashboardSocketReconnect() {
-  if (state.realtime.reconnectTimer) return;
-  state.realtime.reconnectTimer = window.setTimeout(() => {
-    state.realtime.reconnectTimer = null;
-    connectDashboardSocket();
-  }, 3000);
+  dashboardRealtime.clearTimers(state);
 }
 
 function connectDashboardSocket() {
-  if (typeof window.WebSocket === "undefined") return;
-  const currentSocket = state.realtime.socket;
-  if (currentSocket && (currentSocket.readyState === WebSocket.OPEN || currentSocket.readyState === WebSocket.CONNECTING)) {
-    return;
-  }
-  clearRealtimeTimers();
-  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  const socket = new WebSocket(`${protocol}://${window.location.host}/ws/dashboard`);
-  state.realtime.socket = socket;
-  socket.addEventListener("open", () => {
-    if (state.realtime.socket !== socket) return;
-    state.realtime.heartbeatTimer = window.setInterval(() => {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send("ping");
-      }
-    }, 20000);
-  });
-  socket.addEventListener("message", (event) => {
-    try {
-      const payload = JSON.parse(event.data);
-      handleDashboardSocketMessage(payload);
-    } catch (error) {
-      console.warn("实时消息解析失败。", error);
-    }
-  });
-  socket.addEventListener("error", () => {
-    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
-      socket.close();
-    }
-  });
-  socket.addEventListener("close", () => {
-    if (state.realtime.socket === socket) {
-      state.realtime.socket = null;
-    }
-    if (state.realtime.heartbeatTimer) {
-      window.clearInterval(state.realtime.heartbeatTimer);
-      state.realtime.heartbeatTimer = null;
-    }
-    scheduleDashboardSocketReconnect();
-  });
+  dashboardRealtime.connect(state, handleDashboardSocketMessage);
 }
 
 function tickClock() {
@@ -3813,6 +3916,7 @@ window.addEventListener("blur", () => {
     void sendControlStop();
   }
 });
+document.addEventListener("visibilitychange", handleVisibilityChange);
 window.addEventListener("keydown", handleControlKeyDown);
 window.addEventListener("keyup", handleControlKeyUp);
 

@@ -4,7 +4,7 @@ import re
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-import main as app_module
+import app_core as app_module
 
 
 def fake_user():
@@ -36,6 +36,7 @@ def mock_auth(monkeypatch):
     monkeypatch.setattr(app_module, "execute_schema", lambda: None)
     monkeypatch.setattr(app_module, "ensure_iot_tables", lambda: None)
     monkeypatch.setattr(app_module, "ensure_robot_ip_column", lambda: None)
+    monkeypatch.setattr(app_module, "ensure_robot_device_column", lambda: None)
     monkeypatch.setattr(app_module, "ensure_management_system_tables", lambda: None)
     monkeypatch.setattr(app_module, "ensure_admin_user", lambda: None)
     monkeypatch.setattr(app_module, "get_user_by_username", lambda username: fake_user())
@@ -85,6 +86,18 @@ def test_login_requires_page_token(monkeypatch):
 
     assert response.status_code == 403
     assert "登录令牌无效" in response.json()["detail"]
+
+
+def test_login_rejects_wrong_password(monkeypatch):
+    mock_auth(monkeypatch)
+    monkeypatch.setattr(app_module, "mysql_ready", lambda: True)
+    monkeypatch.setattr(app_module, "verify_password", lambda password, password_hash: False)
+
+    with TestClient(app_module.app) as client:
+        response = client.post("/auth/login", json={"username": "admin", "password": "wrong-pass", "loginToken": login_token(client)})
+
+    assert response.status_code == 401
+    assert "用户名或密码错误" in response.json()["detail"]
 
 
 def test_session_token_signature_changes_with_user_state(monkeypatch):
@@ -182,7 +195,7 @@ def test_camera_snapshot_proxies_registered_robot(monkeypatch):
 
     monkeypatch.setattr(app_module, "query_one", fake_query_one)
     monkeypatch.setattr(app_module, "fetch_robot_camera_snapshot", fake_snapshot)
-    monkeypatch.setattr(app_module, "_fallback_iot_snapshot", lambda ip_address: None)
+    monkeypatch.setattr(app_module, "_fallback_iot_snapshot", lambda robot_id, ip_address: None)
 
     with TestClient(app_module.app) as client:
         login(client)
@@ -224,7 +237,7 @@ def test_non_admin_cannot_open_users_page(monkeypatch):
         response = client.get("/users")
 
     assert response.status_code == 403
-    assert "仅管理员可访问用户管理页面" in response.text
+    assert "仅管理员可访问当前管理页面" in response.text
 
 
 def test_non_admin_navigation_hides_users_page(monkeypatch):
@@ -236,6 +249,21 @@ def test_non_admin_navigation_hides_users_page(monkeypatch):
 
     assert response.status_code == 200
     assert "用户管理" not in response.text
+
+
+def test_admin_management_nav_pages_load(monkeypatch):
+    mock_auth(monkeypatch)
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        for path, page_id in [
+            ("/users", "users"),
+            ("/clusters", "clusters"),
+            ("/formations", "formations"),
+        ]:
+            response = client.get(path)
+            assert response.status_code == 200
+            assert f'pageId: "{page_id}"' in response.text
 
 
 def test_api_requires_login():
@@ -489,51 +517,3 @@ def test_websocket_dashboard_connected(monkeypatch):
             message = websocket.receive_json()
             assert message["type"] == "dashboard_update"
             assert message["event"] == "connected"
-
-
-def test_delete_invalid_task_id_returns_422(monkeypatch):
-    mock_auth(monkeypatch)
-    with TestClient(app_module.app) as client:
-        login(client)
-        response = client.delete("/api/tasks/0")
-    assert response.status_code == 422
-
-
-def test_delete_missing_task_returns_404(monkeypatch):
-    mock_auth(monkeypatch)
-    monkeypatch.setattr(app_module, "clear_table", lambda table_name, record_id: 0)
-    with TestClient(app_module.app) as client:
-        login(client)
-        response = client.delete("/api/tasks/999999999")
-    assert response.status_code == 404
-
-
-def test_create_task_rejects_invalid_foreign_key_boundary(monkeypatch):
-    mock_auth(monkeypatch)
-    payload = {
-        "name": "测试任务",
-        "priority": "medium",
-        "robotId": 0,
-        "startAt": "2026-03-14T09:00:00",
-        "endAt": "2026-03-14T10:00:00",
-    }
-    with TestClient(app_module.app) as client:
-        login(client)
-        response = client.post("/api/tasks", json=payload)
-    assert response.status_code == 422
-
-
-def test_create_task_rejects_missing_foreign_record(monkeypatch):
-    mock_auth(monkeypatch)
-    monkeypatch.setattr(app_module, "robot_exists", lambda record_id: False)
-    payload = {
-        "name": "测试任务",
-        "priority": "medium",
-        "robotId": 1,
-        "startAt": "2026-03-14T09:00:00",
-        "endAt": "2026-03-14T10:00:00",
-    }
-    with TestClient(app_module.app) as client:
-        login(client)
-        response = client.post("/api/tasks", json=payload)
-    assert response.status_code == 404

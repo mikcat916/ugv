@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-import main as app_module
+import app_core as app_module
 
 
 def fake_user():
@@ -34,7 +34,9 @@ def mock_auth(monkeypatch):
     monkeypatch.setattr(app_module, "mysql_configured", lambda: True)
     monkeypatch.setattr(app_module, "ensure_database", lambda: None)
     monkeypatch.setattr(app_module, "execute_schema", lambda: None)
+    monkeypatch.setattr(app_module, "ensure_iot_tables", lambda: None)
     monkeypatch.setattr(app_module, "ensure_robot_ip_column", lambda: None)
+    monkeypatch.setattr(app_module, "ensure_robot_device_column", lambda: None)
     monkeypatch.setattr(app_module, "ensure_management_system_tables", lambda: None)
     monkeypatch.setattr(app_module, "ensure_admin_user", lambda: None)
     monkeypatch.setattr(app_module, "get_user_by_username", lambda username: fake_user())
@@ -213,6 +215,7 @@ def test_iot_telemetry_persists_source_ip(monkeypatch):
 def test_iot_camera_snapshot_upload_saves_robot_frame(monkeypatch, tmp_path):
     jpeg = b"\xff\xd8\xff\xe0real-camera-frame"
 
+    monkeypatch.setattr(app_module, "iot_ingest_throttle_interval", lambda request: None)
     monkeypatch.setattr(app_module, "require_device_token", lambda request: 2)
     monkeypatch.setattr(app_module, "query_one", lambda sql, params=None: {"robot_id": 6})
     monkeypatch.setattr(app_module, "robot_camera_upload_path", lambda robot_id: tmp_path / f"{robot_id}.jpg")
@@ -320,7 +323,7 @@ def test_robot_camera_snapshot_rejects_stale_uploaded_frame(monkeypatch):
             "source": "uploaded",
         },
     )
-    monkeypatch.setattr(app_module, "_fallback_iot_snapshot", lambda ip_address: None)
+    monkeypatch.setattr(app_module, "_fallback_iot_snapshot", lambda robot_id, ip_address: None)
 
     async def fake_snapshot(ip_address):
         raise HTTPException(status_code=502, detail="摄像头快照不可达。")
@@ -340,10 +343,8 @@ def test_robot_sensors_latest_marks_stale_items(monkeypatch):
     now = datetime.now()
 
     def fake_query_one(sql, params=None):
-        if "SELECT ip_address FROM robots" in sql:
-            return {"ip_address": "192.168.31.88"}
-        if "SELECT device_id FROM device_telemetry" in sql:
-            return {"device_id": 2}
+        if "FROM robots WHERE id" in sql:
+            return {"id": 6, "ip_address": "192.168.31.88", "device_id": 2}
         return None
 
     monkeypatch.setattr(app_module, "mysql_ready", lambda: True)
@@ -353,6 +354,7 @@ def test_robot_sensors_latest_marks_stale_items(monkeypatch):
         "query_all",
         lambda sql, params=None: [
             {
+                "device_id": 2,
                 "sensor_type": "camera",
                 "channel": "mono",
                 "file_path": "/static/uploads/cameras/new.jpg",
@@ -363,6 +365,7 @@ def test_robot_sensors_latest_marks_stale_items(monkeypatch):
                 "reported_at": now,
             },
             {
+                "device_id": 2,
                 "sensor_type": "lidar",
                 "channel": "scan",
                 "file_path": None,
@@ -382,10 +385,193 @@ def test_robot_sensors_latest_marks_stale_items(monkeypatch):
     assert response.status_code == 200
     payload = response.json()
     assert payload["staleAfterSeconds"] == app_module.camera_stale_seconds()
+    assert payload["staleAfterSecondsByType"]["camera"] == 5
+    assert payload["staleAfterSecondsByType"]["stereo"] == 10
+    assert payload["staleAfterSecondsByType"]["lidar"] == 3
+    assert payload["deviceId"] == 2
+    assert payload["deviceMatchSource"] == "robots.device_id"
     assert payload["sensors"][0]["stale"] is False
     assert payload["sensors"][0]["ageSeconds"] <= 5
     assert payload["sensors"][1]["stale"] is True
     assert payload["sensors"][1]["ageSeconds"] >= 30
+
+
+def test_robot_sensors_latest_falls_back_to_devices_robot_id(monkeypatch):
+    mock_auth(monkeypatch)
+    captured = {}
+
+    def fake_query_one(sql, params=None):
+        if "FROM robots WHERE id" in sql:
+            return {"id": 6, "ip_address": "192.168.31.88", "device_id": None}
+        if "FROM devices" in sql and "robot_id" in sql:
+            return {"id": 3}
+        return None
+
+    def fake_query_all(sql, params=None):
+        captured["params"] = params
+        return []
+
+    monkeypatch.setattr(app_module, "mysql_ready", lambda: True)
+    monkeypatch.setattr(app_module, "query_one", fake_query_one)
+    monkeypatch.setattr(app_module, "query_all", fake_query_all)
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.get("/api/robots/6/sensors/latest")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["deviceId"] == 3
+    assert payload["deviceMatchSource"] == "devices.robot_id"
+    assert captured["params"] == (3,)
+
+
+def test_robot_sensors_latest_falls_back_to_source_ip(monkeypatch):
+    mock_auth(monkeypatch)
+
+    def fake_query_one(sql, params=None):
+        if "FROM robots WHERE id" in sql:
+            return {"id": 6, "ip_address": "192.168.31.88", "device_id": None}
+        if "FROM devices" in sql and "robot_id" in sql:
+            return None
+        if "FROM device_telemetry" in sql:
+            return {"device_id": 4}
+        return None
+
+    monkeypatch.setattr(app_module, "mysql_ready", lambda: True)
+    monkeypatch.setattr(app_module, "query_one", fake_query_one)
+    monkeypatch.setattr(app_module, "query_all", lambda sql, params=None: [])
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.get("/api/robots/6/sensors/latest")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["deviceId"] == 4
+    assert payload["deviceMatchSource"] == "device_telemetry.source_ip"
+
+
+def test_robot_sensors_latest_uses_sensor_type_stale_thresholds(monkeypatch):
+    mock_auth(monkeypatch)
+    now = datetime.now()
+
+    monkeypatch.setattr(app_module, "mysql_ready", lambda: True)
+    monkeypatch.setattr(app_module, "query_one", lambda sql, params=None: {"id": 6, "ip_address": "", "device_id": 2})
+    monkeypatch.setattr(
+        app_module,
+        "query_all",
+        lambda sql, params=None: [
+            {
+                "device_id": 2,
+                "sensor_type": "camera",
+                "channel": "mono",
+                "file_path": "/camera.jpg",
+                "data_json": None,
+                "content_type": "image/jpeg",
+                "size_bytes": 1,
+                "extra_json": None,
+                "reported_at": now - timedelta(seconds=6),
+            },
+            {
+                "device_id": 2,
+                "sensor_type": "stereo",
+                "channel": "left",
+                "file_path": "/left.jpg",
+                "data_json": None,
+                "content_type": "image/jpeg",
+                "size_bytes": 1,
+                "extra_json": None,
+                "reported_at": now - timedelta(seconds=8),
+            },
+            {
+                "device_id": 2,
+                "sensor_type": "lidar",
+                "channel": "scan",
+                "file_path": None,
+                "data_json": '{"ranges":[1.0],"angleMin":0,"angleIncrement":0.1}',
+                "content_type": "application/json",
+                "size_bytes": 20,
+                "extra_json": None,
+                "reported_at": now - timedelta(seconds=4),
+            },
+        ],
+    )
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.get("/api/robots/6/sensors/latest")
+
+    assert response.status_code == 200
+    stale_by_type = {item["sensorType"]: item["stale"] for item in response.json()["sensors"]}
+    assert stale_by_type == {"camera": True, "stereo": False, "lidar": True}
+
+
+def test_latest_sensor_rows_uses_device_type_channel_window(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(app_module, "query_all", lambda sql, params=None: captured.update(sql=sql, params=params) or [])
+
+    rows = app_module.latest_sensor_rows(device_id=2)
+
+    assert rows == []
+    assert "ROW_NUMBER() OVER" in captured["sql"]
+    assert "PARTITION BY s.device_id, s.sensor_type, COALESCE(s.channel, '')" in captured["sql"]
+    assert captured["params"] == (2,)
+
+
+def test_iot_sensor_latest_dedupes_type_channel(monkeypatch):
+    mock_auth(monkeypatch)
+    now = datetime.now()
+
+    monkeypatch.setattr(app_module, "mysql_ready", lambda: True)
+    monkeypatch.setattr(
+        app_module,
+        "query_all",
+        lambda sql, params=None: [
+            {
+                "device_id": 2,
+                "sensor_type": "camera",
+                "channel": "mono",
+                "file_path": "/new.jpg",
+                "data_json": None,
+                "content_type": "image/jpeg",
+                "size_bytes": 2,
+                "extra_json": None,
+                "reported_at": now,
+            },
+            {
+                "device_id": 2,
+                "sensor_type": "camera",
+                "channel": "mono",
+                "file_path": "/old.jpg",
+                "data_json": None,
+                "content_type": "image/jpeg",
+                "size_bytes": 1,
+                "extra_json": None,
+                "reported_at": now - timedelta(seconds=5),
+            },
+            {
+                "device_id": 2,
+                "sensor_type": "lidar",
+                "channel": "scan",
+                "file_path": None,
+                "data_json": '{"ranges":[1.0]}',
+                "content_type": "application/json",
+                "size_bytes": 20,
+                "extra_json": None,
+                "reported_at": now,
+            },
+        ],
+    )
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.get("/api/iot/sensor/latest?device_id=2")
+
+    assert response.status_code == 200
+    sensors = response.json()["sensors"]
+    assert [item["sensorType"] for item in sensors] == ["camera", "lidar"]
+    assert sensors[0]["filePath"] == "/new.jpg"
 
 
 def test_robot_control_queue_mode_enqueues_cmd_vel(monkeypatch):

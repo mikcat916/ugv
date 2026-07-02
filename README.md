@@ -4,9 +4,16 @@
 
 项目当前包含三个主要部分：
 
-- `backend/`：基于 FastAPI 的 Web 管理后台，负责业务页面、CRUD 接口、登录鉴权、实时看板和 IoT 接口。
+- `backend/`：基于 FastAPI 的 Web 管理后台，负责业务页面、CRUD 接口、登录鉴权、实时看板和 IoT 接口；`main.py` 保持 `uvicorn main:app` 入口，主体在 `app_core.py`。
 - `desktop/`：基于 PyQt 的桌面端，提供登录、主控界面、任务管理、状态监控和资产管理等能力。
 - `scripts/`：数据库初始化、MySQL 诊断、树莓派 IoT 客户端和远程部署脚本。
+
+## 已知限制
+
+- 当前主要面向本地自用，不按公网生产部署设计。
+- 默认账号和本地 secret 仅用于本地开发。
+- GPS 实车链路需要硬件在线时单独验证。
+- 桌面端默认连接本机后端地址。
 
 ## 功能概览
 
@@ -239,7 +246,24 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 - 用户名：`admin`
 - 密码：`admin123`
 
-### 4. 启动桌面端
+### 4. Web 本地发布验收
+
+从全新 clone 验收 Web 端时，先按上面的依赖、`.env` 和数据库步骤准备环境，然后运行：
+
+```powershell
+cd E:\Code\Project4
+python scripts\local_release_smoke.py --static
+```
+
+启动后端后，在另一个终端运行：
+
+```powershell
+python scripts\local_release_smoke.py --web --backend-url http://127.0.0.1:8000
+```
+
+再用浏览器人工确认：登录页、Dashboard、设备管理、用户管理、集群管理、编队管理页面均可打开。本轮 Web 验收不包含桌面端启动、断开或重连检查。
+
+### 5. 启动桌面端
 
 ```powershell
 cd E:\Code\Project4\desktop
@@ -325,6 +349,43 @@ network_consider_ip = 1
 - `network_consider_ip = 1` 时，即使没有 Wi-Fi 扫描结果，也可能返回一个较粗的 IP 定位。
 - 若设备侧没有开启扫描权限，脚本仍会继续工作，只是会更依赖 IP 粗定位。
 
+### LiDAR 雷达接入
+
+LiDAR 走 `scripts/ros_iot_bridge.py`，要求车端 ROS 已发布 `sensor_msgs/LaserScan` 话题，并且后台已经为对应设备生成 `X-Device-Token`。
+
+1. 在后台或脚本中创建设备 Token：
+
+```powershell
+python scripts\bootstrap_iot_backend.py --device-id <DEVICE_ID>
+```
+
+2. 在车端 `scripts/iot_client.conf` 中配置后端地址、Token 和雷达话题：
+
+```ini
+[client]
+server = http://<BACKEND_LAN_IP>:8000
+token = <DEVICE_TOKEN>
+
+[sensors]
+lidar_topic = /scan
+lidar_interval = 1
+```
+
+3. 启动 bridge：
+
+```bash
+cd ~/project4/scripts
+python3 ros_iot_bridge.py --config iot_client.conf
+```
+
+4. 接入前可先诊断 `/scan`：
+
+```bash
+python3 scripts/diagnose_lidar_ros.py --topic /scan --duration 5 --min-hz 1
+```
+
+诊断会检查话题是否存在、扫描频率是否达标、`ranges` 是否存在正有限距离值。后台页面在 `/sensors`，选择对应机器人后可查看 LiDAR 画布、最近障碍物距离、左前/正前/右前分区最小距离，并可复制或下载最新雷达 JSON。
+
 ### 当前设备现状
 
 基于 `192.168.31.200` 这台树莓派设备的实际排查结果，当前状态如下：
@@ -404,8 +465,8 @@ python scripts\deploy_iot_client.py --host <PI_HOST> --password <PI_PASSWORD> --
 后端基础测试：
 
 ```powershell
-cd E:\Code\Project4\backend
-python -m pytest -q tests\test_auth_ui.py
+cd E:\Code\Project4
+python -m pytest backend\tests -q
 ```
 
 数据库连通性诊断：
@@ -416,6 +477,39 @@ cd E:\Code\Project4
 ```
 
 诊断日志会输出到根目录 `logs/`。
+
+## 本地常见错误
+
+### MySQL 连不上
+
+- 确认 MySQL 服务已启动。
+- 确认 `.env` 里的 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_DATABASE` 正确。
+- 可先运行 `python scripts\create_database.py --dry-run` 看当前解析到的配置。
+
+### 端口被占用
+
+- 默认后端端口是 `8000`。
+- 临时换端口：`.\start-dev.ps1 -Port 8001`。
+- 或在 `.env` 中修改 `BACKEND_PORT=8001`。
+
+### 依赖安装失败
+
+- 推荐 Python 3.11。
+- 先升级 pip：`python -m pip install -U pip`。
+- 后端依赖：`python -m pip install -r backend\requirements.txt`。
+- 桌面端依赖：`python -m pip install -r desktop\requirements.txt`。
+
+### 登录失败
+
+- 默认本地账号是 `admin / admin123`，仅限本地自用。
+- 如果改过 `.env` 的 `ADMIN_USERNAME` 或 `ADMIN_PASSWORD`，以 `.env` 为准。
+- 如果数据库里已有旧管理员账号，修改 `.env` 不会自动覆盖旧密码；本地可用 `backend\db\reset-db-dev.sql` 清库后重新初始化。
+
+### 桌面端打不开
+
+- 先确认后端能打开：<http://127.0.0.1:8000/api/health>。
+- 从仓库根目录运行 `.\start-desktop.ps1`，它会先检查后端状态。
+- 如果提示缺少 PyQt，运行 `python -m pip install -r desktop\requirements.txt`。
 
 ## 子模块文档
 

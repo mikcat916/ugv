@@ -36,6 +36,16 @@ UAV_DB_PASSWORD=
 UAV_DB_NAME=robot_monitor
 ```
 
+## 后端地址配置
+
+桌面端默认连接 `http://127.0.0.1:8000`。需要改地址时，在根目录 `.env` 中设置：
+
+```env
+UGV_BACKEND_URL=http://127.0.0.1:8000
+```
+
+读取优先级为 `UGV_BACKEND_URL`、`BACKEND_URL`、`BACKEND_HOST` + `BACKEND_PORT`、默认值。登录页会显示后端连接状态，失败时可点击“重新连接”。
+
 ## 运行
 
 ```powershell
@@ -79,3 +89,4 @@ python -m PyQt5.uic.pyuic -x UI/forms/<name>.ui -o UI/generated/<name>.py
 - `ModuleNotFoundError: No module named 'UI'`：请确保从 `desktop/` 目录运行 `python main.py`。
 - 缺少 PyQt 依赖：运行 `python -m pip install -r requirements.txt`。
 - 数据库连接失败：确认根目录 `.env` 中的 `UAV_DB_*` 与 MySQL 配置一致。
+- 后端连接失败：先运行根目录 `.\start-dev.ps1`，再检查 `.env` 中的 `UGV_BACKEND_URL` 是否指向当前后端。
