@@ -10,7 +10,15 @@ from typing import Any, Callable
 
 AUTOPILOT_MODES = {"manual", "auto_ready", "auto_running", "paused", "fault", "estop"}
 CONTROL_PRIORITY = ("estop", "manual_override", "safety_supervisor", "autopilot", "remote_control")
-STOP_REASONS = {"front_blocked", "both_front_blocked", "lidar_timeout", "control_timeout", "estop"}
+STOP_REASONS = {
+    "front_blocked",
+    "both_front_blocked",
+    "lidar_timeout",
+    "control_timeout",
+    "deadman_timeout",
+    "runtime_timeout",
+    "estop",
+}
 
 
 def _now_iso() -> str:
@@ -33,9 +41,19 @@ def _round_or_none(value: Any, digits: int = 3) -> float | None:
 class AutopilotRuntime:
     """Small in-process autopilot state machine shared by API routes."""
 
-    def __init__(self, lidar_timeout_seconds: float = 2.0, control_timeout_seconds: float = 10.0) -> None:
+    def __init__(
+        self,
+        lidar_timeout_seconds: float = 2.0,
+        control_timeout_seconds: float = 10.0,
+        deadman_timeout_seconds: float = 5.0,
+        max_runtime_seconds: float = 0.0,
+        debug_log_window_seconds: float = 30.0,
+    ) -> None:
         self.lidar_timeout_seconds = float(lidar_timeout_seconds)
         self.control_timeout_seconds = float(control_timeout_seconds)
+        self.deadman_timeout_seconds = float(deadman_timeout_seconds)
+        self.max_runtime_seconds = max(0.0, float(max_runtime_seconds))
+        self.debug_log_window_seconds = max(1.0, float(debug_log_window_seconds))
         self._lock = RLock()
         self._events: list[dict[str, Any]] = []
         self._next_event_id = 1
@@ -75,6 +93,30 @@ class AutopilotRuntime:
             "updatedAt": now,
             "lastControlAt": None,
             "_lastControlMonotonic": None,
+            "startedAt": None,
+            "runtimeSeconds": 0.0,
+            "_startedMonotonic": None,
+            "maxRuntimeSeconds": self.max_runtime_seconds,
+            "debugLogWindowSeconds": self.debug_log_window_seconds,
+            "deadman": {
+                "timeoutSeconds": self.deadman_timeout_seconds,
+                "lastRenewedAt": None,
+                "ageSeconds": None,
+                "expired": False,
+                "source": "",
+                "_lastRenewedMonotonic": None,
+            },
+            "safety": {
+                "dryRun": False,
+                "safe": True,
+                "reason": "startup",
+                "rawCmd": {"linearX": 0.0, "angularZ": 0.0},
+                "finalCmd": {"linearX": 0.0, "angularZ": 0.0},
+                "lastRawCmdAt": None,
+                "lastFinalCmdAt": None,
+            },
+            "cmdVelLog": [],
+            "obstacleStatusLog": [],
             "lidar": {
                 "online": False,
                 "ageSeconds": None,
@@ -119,6 +161,8 @@ class AutopilotRuntime:
             self._state["robotId"] = self._parse_optional_id(robot_id, self._state.get("robotId"))
             self._state["requestedAuto"] = True
             self._state["manualOverride"] = False
+            self._mark_runtime_started_locked()
+            self._renew_deadman_locked("api_start")
             lidar_ok = self._lidar_ready_locked()
             self._state["mode"] = "auto_running" if lidar_ok else "auto_ready"
             self._state["reason"] = "front_clear" if lidar_ok else self._unsafe_reason_locked("lidar_timeout")
@@ -136,6 +180,7 @@ class AutopilotRuntime:
             self._state["reason"] = reason
             self._state["linearX"] = 0.0
             self._state["angularZ"] = 0.0
+            self._clear_runtime_started_locked()
             self._state["updatedAt"] = _now_iso()
             self._record_event_locked("info", "autopilot_paused", "自动驾驶暂停", {"reason": reason})
             return self._snapshot_locked()
@@ -147,6 +192,8 @@ class AutopilotRuntime:
             self._state["robotId"] = self._parse_optional_id(robot_id, self._state.get("robotId"))
             self._state["requestedAuto"] = True
             self._state["manualOverride"] = False
+            self._mark_runtime_started_locked()
+            self._renew_deadman_locked("api_resume")
             lidar_ok = self._lidar_ready_locked()
             self._state["mode"] = "auto_running" if lidar_ok else "auto_ready"
             self._state["safe"] = lidar_ok
@@ -166,6 +213,7 @@ class AutopilotRuntime:
             self._state["safe"] = not self._state.get("estop")
             self._state["linearX"] = 0.0
             self._state["angularZ"] = 0.0
+            self._clear_runtime_started_locked()
             self._state["updatedAt"] = _now_iso()
             self._record_event_locked("info", "autopilot_stopped", "自动驾驶停止", {"reason": reason})
             return self._snapshot_locked()
@@ -181,6 +229,7 @@ class AutopilotRuntime:
             self._state["reason"] = "user_estop"
             self._state["linearX"] = 0.0
             self._state["angularZ"] = 0.0
+            self._clear_runtime_started_locked()
             self._state["updatedAt"] = _now_iso()
             self._record_event_locked("critical", "estop_triggered", "急停触发", {"reason": "user_estop"})
             return self._snapshot_locked()
@@ -196,6 +245,7 @@ class AutopilotRuntime:
             self._state["reason"] = "estop_cleared"
             self._state["linearX"] = 0.0
             self._state["angularZ"] = 0.0
+            self._clear_runtime_started_locked()
             self._state["updatedAt"] = _now_iso()
             self._active_faults.discard("estop")
             self._record_event_locked("info", "estop_cleared", "急停解除", {"manualReset": True})
@@ -211,6 +261,7 @@ class AutopilotRuntime:
                 self._state["reason"] = "manual_override"
                 self._state["linearX"] = 0.0
                 self._state["angularZ"] = 0.0
+                self._clear_runtime_started_locked()
             self._state["manualOverride"] = True
             self._state["updatedAt"] = _now_iso()
             if changed:
@@ -231,6 +282,10 @@ class AutopilotRuntime:
             lidar_payload = payload.get("lidar") if isinstance(payload.get("lidar"), dict) else {}
             if lidar_payload:
                 self._update_lidar_locked(lidar_payload)
+
+            safety_payload = payload.get("safety") if isinstance(payload.get("safety"), dict) else {}
+            if safety_payload:
+                self._update_safety_locked(safety_payload)
 
             linear = _round_or_none(payload.get("linearX", payload.get("linear_x")))
             angular = _round_or_none(payload.get("angularZ", payload.get("angular_z")))
@@ -257,9 +312,30 @@ class AutopilotRuntime:
                 self._state["safe"] = bool(payload.get("safe"))
 
             self._state["updatedAt"] = _now_iso()
+            self._apply_safety_motion_locked()
             self._derive_auto_mode_locked()
             self._apply_timeouts_locked()
             return self._snapshot_locked()
+
+    def renew_deadman(self, source: str = "api", robot_id: Any = None) -> dict[str, Any]:
+        with self._lock:
+            self._state["robotId"] = self._parse_optional_id(robot_id, self._state.get("robotId"))
+            self._renew_deadman_locked(source)
+            self._apply_timeouts_locked()
+            self._state["updatedAt"] = _now_iso()
+            return self._snapshot_locked()
+
+    def debug_log(self, event_limit: int = 50) -> dict[str, Any]:
+        with self._lock:
+            self._apply_timeouts_locked()
+            status = self._snapshot_locked()
+        return {
+            "generatedAt": _now_iso(),
+            "status": status,
+            "events": self.events(event_limit, robot_id=status.get("robotId")),
+            "cmdVelLog": copy.deepcopy(status.get("cmdVelLog") or []),
+            "obstacleStatusLog": copy.deepcopy(status.get("obstacleStatusLog") or []),
+        }
 
     def _update_lidar_locked(self, payload: dict[str, Any]) -> None:
         lidar = self._state["lidar"]
@@ -286,6 +362,44 @@ class AutopilotRuntime:
         elif payload.get("updatedAt") is None:
             lidar["online"] = False
             lidar["_lastSeenMonotonic"] = None
+        self._append_obstacle_log_locked(payload)
+
+    def _update_safety_locked(self, payload: dict[str, Any]) -> None:
+        safety = self._state["safety"]
+        if "dryRun" in payload or "dry_run" in payload:
+            safety["dryRun"] = bool(payload.get("dryRun", payload.get("dry_run")))
+        if "safe" in payload:
+            safety["safe"] = bool(payload.get("safe"))
+        reason = str(payload.get("reason") or "").strip()
+        if reason:
+            safety["reason"] = reason
+        raw_cmd = self._normalize_cmd(payload.get("rawCmd") or payload.get("raw_cmd"))
+        final_cmd = self._normalize_cmd(payload.get("finalCmd") or payload.get("final_cmd"))
+        if raw_cmd is not None:
+            safety["rawCmd"] = raw_cmd
+        if final_cmd is not None:
+            safety["finalCmd"] = final_cmd
+        if payload.get("lastRawCmdAt"):
+            safety["lastRawCmdAt"] = str(payload.get("lastRawCmdAt"))
+        if payload.get("lastFinalCmdAt"):
+            safety["lastFinalCmdAt"] = str(payload.get("lastFinalCmdAt"))
+        cmd_log = payload.get("cmdVelLog", payload.get("cmd_vel_log"))
+        if isinstance(cmd_log, list):
+            self._state["cmdVelLog"] = self._normalize_recent_log(cmd_log)
+        obstacle_log = payload.get("obstacleStatusLog", payload.get("obstacle_status_log"))
+        if isinstance(obstacle_log, list):
+            self._state["obstacleStatusLog"] = self._normalize_recent_log(obstacle_log)
+
+    def _apply_safety_motion_locked(self) -> None:
+        final_cmd = self._state.get("safety", {}).get("finalCmd")
+        if not isinstance(final_cmd, dict):
+            return
+        linear = _round_or_none(final_cmd.get("linearX", final_cmd.get("linear_x")))
+        angular = _round_or_none(final_cmd.get("angularZ", final_cmd.get("angular_z")))
+        if linear is not None:
+            self._state["linearX"] = linear
+        if angular is not None:
+            self._state["angularZ"] = angular
 
     def _derive_auto_mode_locked(self) -> None:
         if self._state.get("estop"):
@@ -302,6 +416,7 @@ class AutopilotRuntime:
             self._state["reason"] = "manual_override"
             self._state["linearX"] = 0.0
             self._state["angularZ"] = 0.0
+            self._clear_runtime_started_locked()
             return
         lidar_ok = self._lidar_ready_locked()
         if lidar_ok:
@@ -319,11 +434,15 @@ class AutopilotRuntime:
         self._state["reason"] = reason
         if self._state.get("mode") == "auto_running":
             self._state["mode"] = "paused" if reason in {"front_blocked", "both_front_blocked"} else "fault"
+            if self._state["mode"] != "auto_running":
+                self._clear_runtime_started_locked()
         if reason in {"front_blocked", "both_front_blocked"}:
             self._record_fault_once_locked("front_blocked", "warning", "front_obstacle_too_close", "前方障碍物过近")
 
     def _apply_timeouts_locked(self) -> None:
         now = time.monotonic()
+        self._update_deadman_age_locked(now)
+        self._update_runtime_age_locked(now)
         lidar = self._state["lidar"]
         last_lidar = lidar.get("_lastSeenMonotonic")
         if last_lidar is None:
@@ -362,6 +481,27 @@ class AutopilotRuntime:
                 self._state["linearX"] = 0.0
                 self._state["angularZ"] = 0.0
                 self._record_fault_once_locked("control_timeout", "warning", "control_timeout", "控制指令超时")
+                self._clear_runtime_started_locked()
+
+        if self._state.get("mode") == "auto_running" and self._state["deadman"].get("expired"):
+            self._state["mode"] = "fault"
+            self._state["safe"] = False
+            self._state["reason"] = "deadman_timeout"
+            self._state["linearX"] = 0.0
+            self._state["angularZ"] = 0.0
+            self._record_fault_once_locked("deadman_timeout", "warning", "deadman_timeout", "自动驾驶续命超时")
+            self._clear_runtime_started_locked()
+
+        if self._state.get("mode") == "auto_running" and self.max_runtime_seconds > 0:
+            runtime = _finite_float(self._state.get("runtimeSeconds")) or 0.0
+            if runtime > self.max_runtime_seconds:
+                self._state["mode"] = "fault"
+                self._state["safe"] = False
+                self._state["reason"] = "runtime_timeout"
+                self._state["linearX"] = 0.0
+                self._state["angularZ"] = 0.0
+                self._record_fault_once_locked("runtime_timeout", "warning", "runtime_timeout", "自动驾驶运行时间超过上限")
+                self._clear_runtime_started_locked()
 
     def _lidar_ready_locked(self) -> bool:
         lidar = self._state["lidar"]
@@ -394,9 +534,85 @@ class AutopilotRuntime:
         state = copy.deepcopy(self._state)
         state.pop("requestedAuto", None)
         state.pop("_lastControlMonotonic", None)
+        state.pop("_startedMonotonic", None)
+        if isinstance(state.get("deadman"), dict):
+            state["deadman"].pop("_lastRenewedMonotonic", None)
         if isinstance(state.get("lidar"), dict):
             state["lidar"].pop("_lastSeenMonotonic", None)
         return state
+
+    def _mark_runtime_started_locked(self) -> None:
+        self._state["_startedMonotonic"] = time.monotonic()
+        self._state["startedAt"] = _now_iso()
+        self._state["runtimeSeconds"] = 0.0
+
+    def _clear_runtime_started_locked(self) -> None:
+        self._state["_startedMonotonic"] = None
+        self._state["startedAt"] = None
+        self._state["runtimeSeconds"] = 0.0
+
+    def _update_runtime_age_locked(self, now: float) -> None:
+        started = self._state.get("_startedMonotonic")
+        if started is None:
+            self._state["runtimeSeconds"] = 0.0
+            return
+        self._state["runtimeSeconds"] = round(max(0.0, now - float(started)), 3)
+
+    def _renew_deadman_locked(self, source: str) -> None:
+        deadman = self._state["deadman"]
+        deadman["_lastRenewedMonotonic"] = time.monotonic()
+        deadman["lastRenewedAt"] = _now_iso()
+        deadman["ageSeconds"] = 0.0
+        deadman["expired"] = False
+        deadman["source"] = str(source or "api")[:64]
+        self._active_faults.discard("deadman_timeout")
+
+    def _update_deadman_age_locked(self, now: float) -> None:
+        deadman = self._state["deadman"]
+        timeout = _finite_float(deadman.get("timeoutSeconds")) or self.deadman_timeout_seconds
+        last = deadman.get("_lastRenewedMonotonic")
+        if last is None:
+            deadman["ageSeconds"] = None
+            deadman["expired"] = self._state.get("mode") == "auto_running"
+            return
+        age = max(0.0, now - float(last))
+        deadman["ageSeconds"] = round(age, 3)
+        deadman["expired"] = timeout > 0 and age > timeout
+
+    def _normalize_cmd(self, value: Any) -> dict[str, float] | None:
+        if not isinstance(value, dict):
+            return None
+        return {
+            "linearX": _round_or_none(value.get("linearX", value.get("linear_x")), 4) or 0.0,
+            "angularZ": _round_or_none(value.get("angularZ", value.get("angular_z")), 4) or 0.0,
+        }
+
+    def _append_obstacle_log_locked(self, payload: dict[str, Any]) -> None:
+        entry = {
+            "createdAt": _now_iso(),
+            "online": bool(payload.get("online", True)),
+            "ageSeconds": _round_or_none(payload.get("ageSeconds", payload.get("age_seconds"))),
+            "frontMin": _round_or_none(payload.get("frontMin", payload.get("front_min"))),
+            "leftFrontMin": _round_or_none(payload.get("leftFrontMin", payload.get("left_front_min"))),
+            "rightFrontMin": _round_or_none(payload.get("rightFrontMin", payload.get("right_front_min"))),
+            "obstacleStatus": str(payload.get("obstacleStatus") or payload.get("obstacle_status") or "").strip(),
+        }
+        self._state["obstacleStatusLog"].insert(0, entry)
+        del self._state["obstacleStatusLog"][100:]
+
+    def _normalize_recent_log(self, items: list[Any]) -> list[dict[str, Any]]:
+        normalized: list[dict[str, Any]] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            age = _finite_float(item.get("ageSeconds", item.get("age_seconds")))
+            if age is not None and age > self.debug_log_window_seconds:
+                continue
+            entry = {str(key): copy.deepcopy(value) for key, value in item.items() if not str(key).startswith("_")}
+            normalized.append(entry)
+            if len(normalized) >= 100:
+                break
+        return normalized
 
     def _record_fault_once_locked(self, key: str, level: str, event_type: str, message: str) -> None:
         if key in self._active_faults:

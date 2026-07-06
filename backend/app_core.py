@@ -121,6 +121,9 @@ ROBOT_CONTROL_MODE = os.getenv("ROBOT_CONTROL_MODE", "direct").strip().lower() o
 AUTOPILOT_RUNTIME = autopilot_helpers.AutopilotRuntime(
     lidar_timeout_seconds=float(os.getenv("AUTOPILOT_LIDAR_TIMEOUT_SECONDS", "2") or "2"),
     control_timeout_seconds=float(os.getenv("AUTOPILOT_CONTROL_TIMEOUT_SECONDS", "10") or "10"),
+    deadman_timeout_seconds=float(os.getenv("AUTOPILOT_DEADMAN_TIMEOUT_SECONDS", "5") or "5"),
+    max_runtime_seconds=float(os.getenv("AUTOPILOT_MAX_RUNTIME_SECONDS", "0") or "0"),
+    debug_log_window_seconds=float(os.getenv("AUTOPILOT_DEBUG_LOG_WINDOW_SECONDS", "30") or "30"),
 )
 AUTOPILOT_MODES = autopilot_helpers.AUTOPILOT_MODES
 AUTOPILOT_CONTROL_PRIORITY = autopilot_helpers.CONTROL_PRIORITY
@@ -2084,6 +2087,18 @@ async def api_autopilot_events(request: Request, limit: int = 20, robotId: Optio
     return JSONResponse({"items": AUTOPILOT_RUNTIME.events(limit, robot_id=robotId)})
 
 
+@app.get("/api/autopilot/debug-log")
+async def api_autopilot_debug_log(request: Request, limit: int = 50) -> Response:
+    require_admin_login(request)
+    payload = AUTOPILOT_RUNTIME.debug_log(event_limit=limit)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="autopilot-debug-{stamp}.json"'},
+    )
+
+
 @app.post("/api/autopilot/start")
 async def api_autopilot_start(request: Request) -> JSONResponse:
     require_admin_login(request)
@@ -2093,6 +2108,17 @@ async def api_autopilot_start(request: Request) -> JSONResponse:
         status = AUTOPILOT_RUNTIME.start(robot_id=robot_id)
     except ValueError as exc:
         handle_autopilot_state_error(exc)
+    await ws_broadcast("autopilot")
+    return JSONResponse(autopilot_response(status))
+
+
+@app.post("/api/autopilot/deadman")
+async def api_autopilot_deadman(request: Request) -> JSONResponse:
+    require_admin_login(request)
+    payload = await request.json()
+    robot_id = optional_robot_id_from_payload(payload)
+    source = str(payload.get("source") or "web").strip() or "web"
+    status = AUTOPILOT_RUNTIME.renew_deadman(source=source, robot_id=robot_id)
     await ws_broadcast("autopilot")
     return JSONResponse(autopilot_response(status))
 

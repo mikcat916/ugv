@@ -1,4 +1,6 @@
+import json
 import re
+import time
 
 from fastapi.testclient import TestClient
 
@@ -193,6 +195,124 @@ def test_estop_report_forces_zero_motion():
     assert status["reason"] == "user_estop"
     assert status["linearX"] == 0.0
     assert status["angularZ"] == 0.0
+
+
+def test_deadman_timeout_faults_running_autopilot():
+    runtime = app_module.autopilot_helpers.AutopilotRuntime(deadman_timeout_seconds=0.1)
+    runtime.update_report(
+        {
+            "mode": "manual",
+            "lidar": {
+                "online": True,
+                "ageSeconds": 0.0,
+                "frontMin": 1.5,
+                "obstacleStatus": "front_clear",
+            },
+        }
+    )
+    runtime.start()
+    runtime._state["deadman"]["_lastRenewedMonotonic"] = time.monotonic() - 0.2
+
+    status = runtime.status(include_events=False)
+
+    assert status["mode"] == "fault"
+    assert status["reason"] == "deadman_timeout"
+    assert status["linearX"] == 0.0
+    assert status["deadman"]["expired"] is True
+
+
+def test_max_runtime_timeout_faults_running_autopilot():
+    runtime = app_module.autopilot_helpers.AutopilotRuntime(deadman_timeout_seconds=5, max_runtime_seconds=0.1)
+    runtime.update_report(
+        {
+            "mode": "manual",
+            "lidar": {
+                "online": True,
+                "ageSeconds": 0.0,
+                "frontMin": 1.5,
+                "obstacleStatus": "front_clear",
+            },
+        }
+    )
+    runtime.start()
+    runtime._state["_startedMonotonic"] = time.monotonic() - 0.2
+
+    status = runtime.status(include_events=False)
+
+    assert status["mode"] == "fault"
+    assert status["reason"] == "runtime_timeout"
+    assert status["linearX"] == 0.0
+    assert status["runtimeSeconds"] == 0.0
+
+
+def test_safety_report_updates_final_cmd_and_recent_logs():
+    runtime = app_module.autopilot_helpers.AutopilotRuntime()
+
+    status = runtime.update_report(
+        {
+            "mode": "manual",
+            "safety": {
+                "dryRun": True,
+                "reason": "front_blocked",
+                "rawCmd": {"linearX": 0.1, "angularZ": 0.2},
+                "finalCmd": {"linearX": 0.0, "angularZ": 0.0},
+                "cmdVelLog": [
+                    {
+                        "createdAt": "2026-03-10T12:00:00",
+                        "source": "stop",
+                        "reason": "front_blocked",
+                        "rawCmd": {"linearX": 0.1, "angularZ": 0.2},
+                        "finalCmd": {"linearX": 0.0, "angularZ": 0.0},
+                    }
+                ],
+                "obstacleStatusLog": [
+                    {
+                        "createdAt": "2026-03-10T12:00:00",
+                        "online": True,
+                        "frontMin": 0.4,
+                        "obstacleStatus": "front_blocked",
+                    }
+                ],
+            },
+        }
+    )
+
+    assert status["safety"]["dryRun"] is True
+    assert status["safety"]["rawCmd"]["linearX"] == 0.1
+    assert status["safety"]["finalCmd"]["linearX"] == 0.0
+    assert status["linearX"] == 0.0
+    assert status["cmdVelLog"][0]["reason"] == "front_blocked"
+    assert status["obstacleStatusLog"][0]["frontMin"] == 0.4
+
+
+def test_deadman_endpoint_renews_status(monkeypatch):
+    reset_runtime()
+    mock_auth(monkeypatch)
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.post("/api/autopilot/deadman", json={"source": "desktop"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["deadman"]["source"] == "desktop"
+    assert payload["deadman"]["expired"] is False
+
+
+def test_debug_log_endpoint_exports_json(monkeypatch):
+    reset_runtime()
+    mock_auth(monkeypatch)
+    app_module.AUTOPILOT_RUNTIME.update_report({"mode": "manual", "safety": {"reason": "front_clear"}})
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.get("/api/autopilot/debug-log")
+
+    assert response.status_code == 200
+    assert "attachment" in response.headers["content-disposition"]
+    payload = json.loads(response.text)
+    assert payload["status"]["mode"] == "manual"
+    assert "cmdVelLog" in payload
 
 
 def test_autonomy_events_use_null_robot_id_when_unbound(monkeypatch):

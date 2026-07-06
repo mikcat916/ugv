@@ -121,3 +121,7 @@ def post_autopilot_action(action: str, payload: dict[str, Any] | None = None, ur
     data["ok"] = bool(data.get("ok", True))
     data["url"] = target
     return data
+
+
+def post_autopilot_deadman(url: str | None = None, timeout: float = 3.5) -> dict[str, Any]:
+    return post_autopilot_action("deadman", {"source": "desktop"}, url=url, timeout=timeout)

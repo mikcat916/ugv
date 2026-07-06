@@ -130,13 +130,23 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 自动驾驶页使用后端内存状态机协调 Web 控制、机器人侧 ROS 节点和安全事件日志。LiDAR 安全默认超时为 `2` 秒，可通过 `AUTOPILOT_LIDAR_TIMEOUT_SECONDS` 覆盖；控制指令超时默认 `10` 秒，可通过 `AUTOPILOT_CONTROL_TIMEOUT_SECONDS` 覆盖。
 
+外场加固环境变量：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `AUTOPILOT_DEADMAN_TIMEOUT_SECONDS` | `5` | Web/桌面端续命超时，超时后自动停车并切到故障 |
+| `AUTOPILOT_MAX_RUNTIME_SECONDS` | `0` | 自动驾驶最长运行时间，`0` 表示不限制 |
+| `AUTOPILOT_DEBUG_LOG_WINDOW_SECONDS` | `30` | raw/final cmd 与避障状态调试日志窗口 |
+
 常用接口：
 
 | 接口 | 方法 | 说明 |
 | --- | --- | --- |
 | `/api/autopilot/status` | `GET` | 查询模式、LiDAR、急停、人工接管和事件概览 |
 | `/api/autopilot/events` | `GET` | 查询自动驾驶事件，需要登录 |
+| `/api/autopilot/debug-log` | `GET` | 导出自动驾驶调试日志，需要管理员登录 |
 | `/api/autopilot/start` | `POST` | 启动自动驾驶；LiDAR 不新鲜时停在 `auto_ready` |
+| `/api/autopilot/deadman` | `POST` | Web/桌面端周期性续命 |
 | `/api/autopilot/pause` | `POST` | 暂停自动驾驶并向机器人发送停止 |
 | `/api/autopilot/resume` | `POST` | 继续自动驾驶；急停未解除时返回 `409` |
 | `/api/autopilot/stop` | `POST` | 停止自动驾驶并清零速度 |
@@ -149,6 +159,8 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 - LiDAR 缺失或超过超时阈值时，状态切为不安全并清零 `linearX` / `angularZ`。
 - `frontMin < 0.5m` 或前方阻塞状态会清零速度；运行中会降到 `paused`，等待人工确认后恢复。
 - `estop=true` 永远优先，后端快照强制为 `mode=estop` 且速度为零。
+- 自动驾驶运行中如果 Web/桌面端超过 deadman 窗口未续命，后端会切到 `fault` 并清零速度。
+- 如果设置了最长运行时间，超时后后端会切到 `fault` 并记录 `runtime_timeout`。
 
 ## 本地数据库重置与测试数据
 

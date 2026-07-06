@@ -99,6 +99,32 @@ def test_autopilot_node_default_cmd_topic_is_raw(monkeypatch):
     assert args.cmd_topic == "/autopilot/cmd_vel_raw"
 
 
+def test_autopilot_node_dry_run_does_not_publish_raw_cmd(capsys):
+    node_module = load_module("autopilot_node_test_dry_run", ROOT / "autopilot_node.py")
+
+    class Publisher:
+        def __init__(self):
+            self.messages = []
+
+        def publish(self, msg):
+            self.messages.append(msg)
+
+    class Twist:
+        def __init__(self):
+            self.linear = SimpleNamespace(x=0.0)
+            self.angular = SimpleNamespace(z=0.0)
+
+    backend = SimpleNamespace(config=SimpleNamespace(robot_id=7))
+    publisher = Publisher()
+    node = node_module.AutopilotNode(publisher, Twist, backend, dry_run=True)
+
+    node.publish_velocity(0.08, 0.2)
+
+    assert publisher.messages == []
+    assert node.last_linear == 0.08
+    assert "autopilot_dry_run" in capsys.readouterr().out
+
+
 def test_safety_supervisor_forwards_raw_cmd_when_lidar_is_safe():
     safety = load_module("safety_supervisor_test_forward", ROOT / "safety_supervisor.py")
 
@@ -159,6 +185,43 @@ def test_safety_supervisor_blocks_raw_cmd_when_front_min_is_too_close():
     assert publisher.messages[-1] is not cmd
     assert publisher.messages[-1].linear.x == 0.0
     assert publisher.messages[-1].angular.z == 0.0
+
+
+def test_safety_supervisor_dry_run_records_without_publishing(capsys):
+    safety = load_module("safety_supervisor_test_dry_run", ROOT / "safety_supervisor.py")
+
+    class Publisher:
+        def __init__(self):
+            self.messages = []
+
+        def publish(self, msg):
+            self.messages.append(msg)
+
+    class Twist:
+        def __init__(self):
+            self.linear = SimpleNamespace(x=0.0)
+            self.angular = SimpleNamespace(z=0.0)
+
+    final_publisher = Publisher()
+    safety_publisher = Publisher()
+    supervisor = safety.SafetySupervisor(final_publisher, Twist, dry_run=True, safety_publisher=safety_publisher)
+    supervisor.on_obstacle_status(
+        SimpleNamespace(data=json.dumps({"online": True, "frontMin": 1.2, "obstacleStatus": "front_clear"}))
+    )
+    cmd = Twist()
+    cmd.linear.x = 0.08
+    cmd.angular.z = 0.2
+
+    supervisor.on_raw_cmd(cmd)
+    status = json.loads(safety_publisher.messages[-1])
+
+    assert final_publisher.messages == []
+    assert status["dryRun"] is True
+    assert status["rawCmd"] == {"linearX": 0.08, "angularZ": 0.2}
+    assert status["finalCmd"] == {"linearX": 0.08, "angularZ": 0.2}
+    assert status["cmdVelLog"][0]["source"] == "forwarded"
+    assert status["obstacleStatusLog"][0]["frontMin"] == 1.2
+    assert "safety_dry_run" in capsys.readouterr().out
 
 
 def test_autopilot_node_does_not_block_on_slow_backend():

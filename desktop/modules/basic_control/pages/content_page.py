@@ -22,10 +22,10 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 from UI.generated.content import Ui_Form
 
 try:
-    from app.backend_config import backend_url, get_autopilot_status, post_autopilot_action
+    from app.backend_config import backend_url, get_autopilot_status, post_autopilot_action, post_autopilot_deadman
 except ImportError:
     sys.path.append(str(Path(__file__).resolve().parents[3]))
-    from app.backend_config import backend_url, get_autopilot_status, post_autopilot_action
+    from app.backend_config import backend_url, get_autopilot_status, post_autopilot_action, post_autopilot_deadman
 
 
 class ContentPage(QtWidgets.QWidget, Ui_Form):
@@ -465,6 +465,10 @@ class ContentPage(QtWidgets.QWidget, Ui_Form):
     def refresh_autopilot_status(self) -> None:
         def worker():
             result = get_autopilot_status(self.backend_url)
+            if result.get("ok") and str(result.get("mode") or "") in {"auto_ready", "auto_running"}:
+                renewed = post_autopilot_deadman(self.backend_url)
+                if renewed.get("ok"):
+                    result = renewed
             self.autopilot_status_loaded.emit(result)
 
         threading.Thread(target=worker, daemon=True).start()

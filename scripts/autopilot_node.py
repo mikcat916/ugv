@@ -72,6 +72,10 @@ def action_reason(obstacle: dict[str, Any], backend_status: dict[str, Any]) -> s
     return str(obstacle.get("obstacleStatus") or backend_status.get("reason") or "front_clear")
 
 
+def env_bool(name: str, default: str = "0") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
 class BackendClient:
     def __init__(self, config: BackendConfig) -> None:
         self.config = config
@@ -98,13 +102,15 @@ class BackendClient:
 
 
 class AutopilotNode:
-    def __init__(self, publisher: Any, twist_factory: Any, backend: BackendClient) -> None:
+    def __init__(self, publisher: Any, twist_factory: Any, backend: BackendClient, *, dry_run: bool = False) -> None:
         self.publisher = publisher
         self.twist_factory = twist_factory
         self.backend = backend
+        self.dry_run = dry_run
         self.lock = Lock()
         self.backend_status: dict[str, Any] = {"mode": "manual", "estop": False, "manualOverride": False}
         self.obstacle_status: dict[str, Any] = {}
+        self.safety_status: dict[str, Any] = {}
         self.last_backend_poll = 0.0
         self.last_report = 0.0
         self.last_linear = 0.0
@@ -122,6 +128,15 @@ class AutopilotNode:
         with self.lock:
             self.obstacle_status = status
 
+    def on_safety_status(self, msg: Any) -> None:
+        raw = getattr(msg, "data", msg)
+        try:
+            status = json.loads(raw)
+        except (TypeError, ValueError):
+            status = {"safe": False, "reason": "invalid_safety_status"}
+        with self.lock:
+            self.safety_status = status
+
     def make_twist(self, linear: float, angular: float) -> Any:
         twist = self.twist_factory()
         twist.linear.x = float(linear)
@@ -132,6 +147,9 @@ class AutopilotNode:
         with self.lock:
             self.last_linear = float(linear)
             self.last_angular = float(angular)
+        if self.dry_run:
+            print(json.dumps({"type": "autopilot_dry_run", "linearX": float(linear), "angularZ": float(angular)}, ensure_ascii=False))
+            return
         self.publisher.publish(self.make_twist(linear, angular))
 
     def stop(self, reason: str) -> None:
@@ -185,8 +203,19 @@ class AutopilotNode:
             self.report_inflight = True
             backend_status = dict(self.backend_status)
             obstacle_status = dict(self.obstacle_status)
+            safety_status = dict(self.safety_status)
             last_linear = self.last_linear
             last_angular = self.last_angular
+        if safety_status:
+            safety_status["autopilotDryRun"] = self.dry_run
+        else:
+            safety_status = {
+                "dryRun": self.dry_run,
+                "safe": safe,
+                "reason": reason,
+                "rawCmd": {"linearX": last_linear, "angularZ": last_angular},
+                "finalCmd": {"linearX": last_linear if not self.dry_run else 0.0, "angularZ": last_angular if not self.dry_run else 0.0},
+            }
         payload = {
             "robotId": self.backend.config.robot_id,
             "mode": backend_status.get("mode", "manual"),
@@ -197,6 +226,7 @@ class AutopilotNode:
             "manualOverride": bool(backend_status.get("manualOverride")),
             "estop": bool(backend_status.get("estop")),
             "lidar": obstacle_status or {"online": False, "obstacleStatus": "lidar_timeout"},
+            "safety": safety_status,
         }
 
         def worker() -> None:
@@ -228,7 +258,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--token", default=os.getenv("PROJECT4_AUTOPILOT_TOKEN", ""), help="Device token for /api/iot/autopilot/status reports.")
     parser.add_argument("--robot-id", type=int, default=int(os.getenv("PROJECT4_AUTOPILOT_ROBOT_ID", "0") or "0"), help="Robot ID to include in reports.")
     parser.add_argument("--obstacle-topic", default="/autopilot/obstacle_status", help="Obstacle JSON topic.")
+    parser.add_argument("--safety-topic", default="/autopilot/safety_status", help="Safety supervisor JSON topic.")
     parser.add_argument("--cmd-topic", default="/autopilot/cmd_vel_raw", help="Raw velocity command topic for safety supervision.")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=env_bool("PROJECT4_AUTOPILOT_DRY_RUN"),
+        help="Print decisions without publishing raw velocity commands.",
+    )
     parser.add_argument("--rate", type=float, default=10.0, help="Main loop frequency.")
     return parser.parse_args()
 
@@ -249,8 +286,9 @@ def main() -> None:
         )
     )
     publisher = rospy.Publisher(args.cmd_topic, Twist, queue_size=10)
-    node = AutopilotNode(publisher, Twist, backend)
+    node = AutopilotNode(publisher, Twist, backend, dry_run=args.dry_run)
     rospy.Subscriber(args.obstacle_topic, String, node.on_obstacle_status, queue_size=10)
+    rospy.Subscriber(args.safety_topic, String, node.on_safety_status, queue_size=10)
     rate = rospy.Rate(max(args.rate, 1.0))
     while not rospy.is_shutdown():
         _linear, _angular, safe, reason = node.tick()

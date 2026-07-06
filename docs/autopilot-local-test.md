@@ -45,6 +45,15 @@ rosrun project4 safety_supervisor.py
 rosrun project4 autopilot_node.py --server http://<backend-ip>:8000 --token <device-token> --robot-id <robot-id>
 ```
 
+Dry-run first pass:
+
+```bash
+python3 scripts/safety_supervisor.py _dry_run:=true
+python3 scripts/autopilot_node.py --dry-run --server http://127.0.0.1:8000 --token <device-token>
+```
+
+Confirm decisions are printed and no velocity reaches the chassis before disabling dry-run.
+
 If running directly from this repository:
 
 ```bash
@@ -60,6 +69,7 @@ Use the Web panel buttons or authenticated POST requests:
 ```bash
 GET  /api/autopilot/status
 POST /api/autopilot/start
+POST /api/autopilot/deadman
 POST /api/autopilot/pause
 POST /api/autopilot/resume
 POST /api/autopilot/stop
@@ -74,6 +84,8 @@ Confirm:
 - Estop immediately sends stop and blocks start/resume until `clear-estop`.
 - Manual remote control pauses automatic driving.
 - Front `< 0.5m` pauses or faults automatic driving and clears backend `linearX` / `angularZ`.
+- Closing the Web/Desktop panel for longer than `AUTOPILOT_DEADMAN_TIMEOUT_SECONDS` causes `reason = deadman_timeout`.
+- Setting `AUTOPILOT_MAX_RUNTIME_SECONDS` to a small value causes `reason = runtime_timeout` after that limit.
 
 ## 6. LiDAR Simulation
 
@@ -96,6 +108,42 @@ rostopic echo /cmd_vel
 
 Confirm raw commands appear first on `/autopilot/cmd_vel_raw`. With safe LiDAR, matching commands should appear on `/cmd_vel`. When LiDAR is stale, E-stop is active, or `frontMin < 0.5`, `/cmd_vel` should receive zero-speed stop commands.
 
-## 8. Event Log
+## 8. Debug Log Export
+
+In the Web autopilot panel, click `导出调试日志` after each test pass and save the downloaded JSON with the field record.
+
+Confirm the file includes:
+
+- `status.safety.rawCmd`
+- `status.safety.finalCmd`
+- `cmdVelLog`
+- `obstacleStatusLog`
+- `events`
+
+## 9. Event Log
 
 Open the Web autopilot panel and confirm the recent event list includes start, pause, resume, stop, estop, clear-estop, LiDAR timeout, front obstacle, and manual override events as those actions occur.
+
+## 10. Field Test Record Template
+
+```text
+Test date/time:
+Operator:
+Robot ID:
+Backend URL:
+Weather / ground condition:
+Battery level:
+ROS topics checked:
+LiDAR frontMin before start:
+Dry-run result:
+Deadman timeout test:
+Max runtime setting:
+Start time:
+Stop time:
+Stop reason:
+Raw cmd sample:
+Final cmd sample:
+Debug log filename:
+Observed issue:
+Decision:
+```

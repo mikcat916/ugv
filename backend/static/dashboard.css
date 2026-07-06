@@ -1280,7 +1280,8 @@ button:disabled {
 }
 
 .autopilot-status-grid strong,
-.autopilot-lidar-grid strong {
+.autopilot-lidar-grid strong,
+.autopilot-debug-grid strong {
   text-align: right;
 }
 

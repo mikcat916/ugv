@@ -119,6 +119,8 @@ const state = {
     error: "",
     loading: false,
     actionInFlight: "",
+    deadmanInFlight: false,
+    debugExporting: false,
     timer: null,
   },
   deviceManagementTab: "categories",
@@ -206,6 +208,9 @@ const AUTOPILOT_REASON_TEXT = {
   both_front_blocked: "左右前方均受阻，停车",
   lidar_timeout: "LiDAR 超过 2 秒未更新",
   control_timeout: "控制指令超时",
+  deadman_timeout: "续命超时，自动停车",
+  runtime_timeout: "自动驾驶运行超时，自动停车",
+  backend_unreachable: "后端连接异常",
   user_paused: "用户暂停",
   stopped_by_user: "用户停止",
   manual_override: "人工接管",
@@ -2254,6 +2259,24 @@ function formatNullableSeconds(value) {
   return Number.isFinite(numeric) ? `${numeric.toFixed(2)} s` : "-";
 }
 
+function formatVelocity(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? `${numeric.toFixed(3)} m/s` : "-";
+}
+
+function formatAngularVelocity(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? `${numeric.toFixed(3)} rad/s` : "-";
+}
+
+function autopilotCmd(status, key) {
+  const cmd = status?.safety?.[key] || {};
+  return {
+    linearX: Number(cmd.linearX),
+    angularZ: Number(cmd.angularZ),
+  };
+}
+
 function autopilotActionDisabled(action, selectedRobot, status) {
   const noTarget = !selectedRobot && !String(appConfig.robotControl?.host || "").trim();
   const offline = selectedRobot && robotIsOffline(selectedRobot);
@@ -2273,12 +2296,20 @@ function renderAutopilotPage() {
   const selectedRobot = resolveAutopilotRobot();
   const status = state.autopilot.status || {};
   const lidar = status.lidar || {};
+  const safety = status.safety || {};
+  const deadman = status.deadman || {};
+  const rawCmd = autopilotCmd(status, "rawCmd");
+  const finalCmd = autopilotCmd(status, "finalCmd");
+  const diffLinear = finalCmd.linearX - rawCmd.linearX;
+  const diffAngular = finalCmd.angularZ - rawCmd.angularZ;
   const modeTone = autopilotStatusTone(status);
   const selectableRobots = autopilotRobots();
   const targetName = selectedRobot ? selectedRobot.model : "未选择机器人";
   const targetHost = selectedRobot?.ipAddress || appConfig.robotControl?.host || "未配置";
   const targetNetwork = selectedRobot ? localizeToken(selectedRobot.networkStatus || selectedRobot.telemetryStatus || "offline") : "无可控车辆";
   const events = Array.isArray(status.events) ? status.events : [];
+  const cmdVelLog = Array.isArray(status.cmdVelLog) ? status.cmdVelLog : [];
+  const obstacleStatusLog = Array.isArray(status.obstacleStatusLog) ? status.obstacleStatusLog : [];
   const error = state.autopilot.error ? `<p class="form-error" role="alert">${escapeHtml(state.autopilot.error)}</p>` : "";
   const actionButton = (action, label, className = "secondary-button") => (
     `<button class="${className}" type="button" data-autopilot-action="${escapeHtml(action)}"${autopilotActionDisabled(action, selectedRobot, status)}>${escapeHtml(label)}</button>`
@@ -2297,6 +2328,7 @@ function renderAutopilotPage() {
             ${renderControlRobotOptions(state.autopilot.robotId)}
           </select>
           <button class="secondary-button" id="autopilot-refresh" type="button"${state.autopilot.loading ? " disabled" : ""}>刷新</button>
+          <button class="secondary-button" id="autopilot-export-debug" type="button"${state.autopilot.debugExporting ? " disabled" : ""}>导出调试日志</button>
           ${actionButton("estop", "急停", "danger-button critical-action")}
         </div>
       </div>
@@ -2308,11 +2340,16 @@ function renderAutopilotPage() {
       </div>
       <div class="control-status-strip autopilot-status-grid">
         <span>安全状态 <strong>${status.safe === false ? "不安全" : "安全"}</strong></span>
-        <span>线速度 <strong>${escapeHtml(formatNullableDistance(status.linearX).replace(" m", " m/s"))}</strong></span>
-        <span>角速度 <strong>${Number.isFinite(Number(status.angularZ)) ? `${Number(status.angularZ).toFixed(3)} rad/s` : "-"}</strong></span>
+        <span>最终线速度 <strong>${escapeHtml(formatVelocity(status.linearX))}</strong></span>
+        <span>最终角速度 <strong>${escapeHtml(formatAngularVelocity(status.angularZ))}</strong></span>
+        <span>停车原因 <strong>${escapeHtml(autopilotReasonText(status.reason, status))}</strong></span>
         <span>人工接管 <strong>${status.manualOverride ? "是" : "否"}</strong></span>
         <span>急停 <strong>${status.estop ? "已触发" : "未触发"}</strong></span>
         <span>更新时间 <strong>${escapeHtml(formatDateTime(status.updatedAt))}</strong></span>
+        <span>运行时长 <strong>${escapeHtml(formatNullableSeconds(status.runtimeSeconds))}</strong></span>
+        <span>最长运行 <strong>${Number(status.maxRuntimeSeconds) > 0 ? escapeHtml(formatNullableSeconds(status.maxRuntimeSeconds)) : "未限制"}</strong></span>
+        <span>续命 <strong>${deadman.expired ? "超时" : "正常"}</strong></span>
+        <span>续命年龄 <strong>${escapeHtml(formatNullableSeconds(deadman.ageSeconds))}</strong></span>
       </div>
       <div class="button-row autopilot-actions">
         ${actionButton("start", "启动自动驾驶", "primary-button")}
@@ -2320,6 +2357,25 @@ function renderAutopilotPage() {
         ${actionButton("resume", "继续")}
         ${actionButton("stop", "停止")}
         ${actionButton("clear-estop", "解除急停")}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h3>安全监督器输出</h3>
+          <p class="muted">最终速度来自 safety_supervisor 的 raw cmd 审核结果。</p>
+        </div>
+      </div>
+      <div class="control-status-strip autopilot-debug-grid">
+        <span>Dry-run <strong>${safety.dryRun || safety.autopilotDryRun ? "开启" : "关闭"}</strong></span>
+        <span>监督器原因 <strong>${escapeHtml(autopilotReasonText(safety.reason || status.reason, status))}</strong></span>
+        <span>Raw 线速度 <strong>${escapeHtml(formatVelocity(rawCmd.linearX))}</strong></span>
+        <span>Final 线速度 <strong>${escapeHtml(formatVelocity(finalCmd.linearX))}</strong></span>
+        <span>线速度差值 <strong>${escapeHtml(formatVelocity(diffLinear))}</strong></span>
+        <span>Raw 角速度 <strong>${escapeHtml(formatAngularVelocity(rawCmd.angularZ))}</strong></span>
+        <span>Final 角速度 <strong>${escapeHtml(formatAngularVelocity(finalCmd.angularZ))}</strong></span>
+        <span>角速度差值 <strong>${escapeHtml(formatAngularVelocity(diffAngular))}</strong></span>
       </div>
     </section>
 
@@ -2337,6 +2393,48 @@ function renderAutopilotPage() {
         <span>左前最近 <strong>${escapeHtml(formatNullableDistance(lidar.leftFrontMin))}</strong></span>
         <span>右前最近 <strong>${escapeHtml(formatNullableDistance(lidar.rightFrontMin))}</strong></span>
         <span>障碍状态 <strong>${escapeHtml(autopilotReasonText(lidar.obstacleStatus || status.reason, status))}</strong></span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h3>最近控制与避障日志</h3>
+          <p class="muted">窗口：最近 ${escapeHtml(formatNullableSeconds(status.debugLogWindowSeconds || 30))}。</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>时间</th><th>来源</th><th>Raw</th><th>Final</th><th>原因</th></tr></thead>
+          <tbody>
+            ${cmdVelLog.slice(0, 8).map((item) => `
+              <tr>
+                <td>${escapeHtml(formatDateTime(item.createdAt))}</td>
+                <td>${escapeHtml(item.source || "-")}</td>
+                <td>${escapeHtml(formatVelocity(item.rawCmd?.linearX))} / ${escapeHtml(formatAngularVelocity(item.rawCmd?.angularZ))}</td>
+                <td>${escapeHtml(formatVelocity(item.finalCmd?.linearX))} / ${escapeHtml(formatAngularVelocity(item.finalCmd?.angularZ))}</td>
+                <td>${escapeHtml(autopilotReasonText(item.reason, status))}</td>
+              </tr>
+            `).join("") || `<tr><td colspan="5">暂无控制日志。</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>时间</th><th>在线</th><th>正前</th><th>左前</th><th>右前</th><th>状态</th></tr></thead>
+          <tbody>
+            ${obstacleStatusLog.slice(0, 8).map((item) => `
+              <tr>
+                <td>${escapeHtml(formatDateTime(item.createdAt))}</td>
+                <td>${item.online ? "在线" : "离线"}</td>
+                <td>${escapeHtml(formatNullableDistance(item.frontMin))}</td>
+                <td>${escapeHtml(formatNullableDistance(item.leftFrontMin))}</td>
+                <td>${escapeHtml(formatNullableDistance(item.rightFrontMin))}</td>
+                <td>${escapeHtml(autopilotReasonText(item.obstacleStatus, status))}</td>
+              </tr>
+            `).join("") || `<tr><td colspan="6">暂无避障日志。</td></tr>`}
+          </tbody>
+        </table>
       </div>
     </section>
 
@@ -2366,6 +2464,59 @@ function renderAutopilotPage() {
       ` : `<div class="empty-state">暂无自动驾驶事件。</div>`}
     </section>
   `;
+}
+
+function autopilotNeedsDeadman(status = state.autopilot.status) {
+  return ["auto_ready", "auto_running"].includes(String(status?.mode || ""));
+}
+
+async function renewAutopilotDeadman() {
+  if (state.autopilot.deadmanInFlight || !autopilotNeedsDeadman()) return;
+  state.autopilot.deadmanInFlight = true;
+  try {
+    const robotId = selectedAutopilotRobotId();
+    const payload = await apiFetch("/api/autopilot/deadman", {
+      method: "POST",
+      body: JSON.stringify({ source: "web", ...(robotId ? { robotId } : {}) }),
+    });
+    state.autopilot.status = payload;
+  } catch (error) {
+    state.autopilot.error = error.message;
+  } finally {
+    state.autopilot.deadmanInFlight = false;
+  }
+}
+
+async function downloadAutopilotDebugLog() {
+  if (state.autopilot.debugExporting) return;
+  state.autopilot.debugExporting = true;
+  renderCurrentPage();
+  try {
+    const response = await fetch("/api/autopilot/debug-log", { credentials: "same-origin" });
+    if (response.status === 401) {
+      window.location.href = "/login";
+      throw new Error("登录状态已失效，请重新登录。");
+    }
+    if (!response.ok) {
+      const payload = response.headers.get("content-type")?.includes("application/json") ? await response.json() : null;
+      throw new Error(payload?.detail || `导出失败：${response.status}`);
+    }
+    const blob = await response.blob();
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `autopilot-debug-${stamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    state.autopilot.error = error.message;
+  } finally {
+    state.autopilot.debugExporting = false;
+    if (state.pageId === "autopilot") renderCurrentPage();
+  }
 }
 
 async function loadAutopilotStatus(force = false) {
@@ -2416,6 +2567,9 @@ function bindAutopilotPage() {
   document.getElementById("autopilot-refresh")?.addEventListener("click", () => {
     void loadAutopilotStatus(true);
   });
+  document.getElementById("autopilot-export-debug")?.addEventListener("click", () => {
+    void downloadAutopilotDebugLog();
+  });
   document.querySelectorAll("[data-autopilot-action]").forEach((button) => {
     button.addEventListener("click", () => {
       if (!button.disabled) void sendAutopilotAction(button.dataset.autopilotAction);
@@ -2427,6 +2581,7 @@ function bindAutopilotPage() {
   if (!state.autopilot.timer) {
     state.autopilot.timer = window.setInterval(() => {
       if (state.pageId === "autopilot" && canRefreshRealtimePage()) {
+        void renewAutopilotDeadman();
         void loadAutopilotStatus(true);
       }
     }, AUTOPILOT_REFRESH_MS);
