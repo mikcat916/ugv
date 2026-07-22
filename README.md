@@ -1,524 +1,191 @@
 # Project4
 
-机器人巡检监控系统，面向“后台管理 + 桌面控制 + IoT 设备上报”的一体化场景。
+Project4 is a web backend and robot-device tooling project. The repository now contains the backend, device tools, deployment helpers, tests, documentation, and runtime data.
 
-项目当前包含三个主要部分：
+## Features
 
-- `backend/`：基于 FastAPI 的 Web 管理后台，负责业务页面、CRUD 接口、登录鉴权、实时看板和 IoT 接口；`main.py` 保持 `uvicorn main:app` 入口，主体在 `app_core.py`。
-- `desktop/`：基于 PyQt 的桌面端，提供登录、主控界面、任务管理、状态监控和资产管理等能力。
-- `scripts/`：数据库初始化、MySQL 诊断、树莓派 IoT 客户端和远程部署脚本。
+- FastAPI and Jinja2 web management pages
+- Session login and administrator accounts
+- MySQL schema setup, diagnostics, and local seed data
+- Robot, device, sensor, map, and remote-control pages
+- WebSocket dashboard updates
+- IoT check-in, telemetry, and autopilot status reporting
+- Device-side ROS and robot-control tools
+- Deployment helpers, backend tests, tool tests, and browser tests
 
-## 已知限制
-
-- 当前主要面向本地自用，不按公网生产部署设计。
-- 默认账号和本地 secret 仅用于本地开发。
-- GPS 实车链路需要硬件在线时单独验证。
-- 桌面端默认连接本机后端地址。
-
-## 功能概览
-
-- 用户、设备、巡检区域、巡检点、巡检路线管理
-- FastAPI + Jinja2 一体化 Web 页面
-- Session 登录鉴权和基础健康检查
-- WebSocket 实时看板数据推送
-- 设备 IoT 打卡与遥测上报接口
-- PyQt 桌面端任务执行和状态监控界面
-- MySQL 建库、建表、诊断和部署辅助脚本
-
-## 项目结构
+## Project Structure
 
 ```text
 Project4/
-├── backend/                 # Web 后端与页面模板
-├── desktop/                 # PyQt 桌面端
-├── docs/
-│   └── planning/            # 项目规划与阶段待办
-├── logs/                    # 诊断脚本输出日志
-├── scripts/                 # 建库、诊断、IoT 与部署脚本
-├── .conda/                  # 本地 Python 环境（如果已创建）
-├── create_database.bat      # 一键建库建表
-├── start.bat                # 一键启动后端
-├── start.ps1                # 后端启动脚本
-├── test_mysql_connection.bat# 一键诊断 MySQL 连接
-└── README.md
+|-- apps/backend/              Backend source, pages, static files, and SQL
+|-- tools/dev/                 Local setup, database, diagnostics, and release tools
+|-- tools/device/              Device reporting, LiDAR, and control tools
+|-- tools/deploy/              Remote deployment helpers
+|-- tools/perception/          Perception and target-following tools
+|-- tests/backend/             Backend API and page tests
+|-- tests/tools/               Tool tests
+|-- tests/e2e/                 Browser flow tests
+|-- docs/checklists/           Local verification checklists
+|-- docs/guides/               Feature guides
+|-- docs/planning/             Plans and task lists
+|-- docs/releases/             Release notes
+|-- logs/                      Local runtime logs
+|-- var/                       Uploads and runtime data
+|-- .env.example               Configuration example
+|-- requirements.txt           Runtime dependency entry point
+|-- requirements-dev.txt       Development and test dependencies
+|-- start-dev.ps1              Local development launcher
+|-- start.ps1 / start.bat      Backend launchers
+|-- create_database.bat        Database initialization launcher
+`-- test_mysql_connection.bat  MySQL connection diagnostic launcher
 ```
 
-## 技术栈
+## Requirements
 
-### Web 端
+- Python 3.11 recommended
+- MySQL 8.0 or newer
+- Windows PowerShell for the local launchers
 
-- Python
-- FastAPI
-- Jinja2
-- PyMySQL
-- Uvicorn
-- MySQL 8
-- 原生 JavaScript
-
-### 桌面端
-
-- Python
-- PyQt5 / PyQtWebEngine
-- PyQt-Fluent-Widgets
-- PyMySQL / mysql-connector-python
-
-## 当前进度
-
-根据 [docs/planning/todolist.md](./docs/planning/todolist.md) 当前状态如下：
-
-- 阶段一到阶段四已基本完成，包括数据库建模、后端 CRUD、Web 页面和 IoT 通信能力。
-- 阶段五仍在进行中，主要是前后端联调、设备模拟和端到端流程测试。
-
-如果你是第一次接手这个仓库，可以优先从 Web 后端启动和数据库连通性检查开始。
-
-## 仓库整理说明
-
-当前仓库按“源码 + 文档规划 + 本地产物”划分：
-
-- `backend/`、`desktop/`、`scripts/` 仍是主要源码目录，保持现有运行路径不变。
-- `docs/planning/` 用于放置阶段规划和待办文档，当前 `todolist.md` 已移动到这里。
-- `.conda/`、`logs/`、`test-results/`、`.claude/` 等目录属于本地环境、调试或生成产物，不作为主结构的一部分。
-
-
-## 环境要求
-
-- Windows + PowerShell（当前脚本优先按 Windows 开发环境组织）
-- Python 3.11 推荐用于后端和桌面端
-- MySQL 8.0+
-
-建议为 `backend` 和 `desktop` 分别准备独立 Python 环境，避免桌面依赖与后端依赖互相影响。
-
-## 本地启动
-
-最短流程：
-
-```text
-1. 复制 .env.example 为 .env，并按本机 MySQL 修改账号密码
-2. 启动 MySQL
-3. 运行 .\start-dev.ps1
-4. 打开 http://127.0.0.1:8000
-```
-
-PowerShell 示例：
+## Quick Start
 
 ```powershell
-cd E:\Code\Project4
+cd E:/Code/Project4
 Copy-Item .env.example .env
 notepad .env
-.\start-dev.ps1
+python -m pip install -r requirements.txt
+./start-dev.ps1
 ```
 
-`start-dev.ps1` 会自动检查 Python、后端依赖、MySQL 连接和数据库表；数据库不存在时会尝试初始化。
+Open these local endpoints after startup:
 
-默认本地地址：
+- Login: http://127.0.0.1:8000/login
+- Health check: http://127.0.0.1:8000/api/health
+- Short health check: http://127.0.0.1:8000/health
 
-- 后端：<http://127.0.0.1:8000>
-- 登录页：<http://127.0.0.1:8000/login>
-- 健康检查：<http://127.0.0.1:8000/api/health>
-- 短健康检查：<http://127.0.0.1:8000/health>
-- 调试配置（仅 `DEBUG=1`）：<http://127.0.0.1:8000/debug/config>
+The default local administrator is `admin / admin123`. Change it in `.env` for any shared environment.
 
-默认本地管理员账号仅限本地自用：
+## Configuration
 
-- 用户名：`admin`
-- 密码：`admin123`
-
-## 配置说明
-
-根目录 `.env` 是共享数据库配置入口，`backend` 和 `desktop` 都会读取这里的配置。建议先从 `.env.example` 复制。
-
-示例：
+The backend reads the repository root `.env`. Common settings are:
 
 ```env
-# Web 后端数据库
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
 MYSQL_USER=your_mysql_user
 MYSQL_PASSWORD=your_mysql_password
 MYSQL_DATABASE=robot_monitor
 MYSQL_CHARSET=utf8mb4
-
-# 桌面端数据库别名
-UAV_DB_HOST=127.0.0.1
-UAV_DB_PORT=3306
-UAV_DB_USER=your_mysql_user
-UAV_DB_PASSWORD=your_mysql_password
-UAV_DB_NAME=robot_monitor
-
-# 后端可选配置（仅限本地自用默认值）
 SESSION_SECRET=dev-local-secret
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=admin123
-ADMIN_DISPLAY_NAME=系统管理员
+ADMIN_DISPLAY_NAME=Administrator
 ALLOW_SELF_REGISTER=0
 AMAP_WEB_KEY=your_amap_web_js_key
+BACKEND_HOST=127.0.0.1
+BACKEND_PORT=8000
 ```
 
-说明：
+## Database
 
-- 后端启动时会优先读取根目录 `.env`，同时兼容 `backend/.env`。
-- 桌面端数据库配置读取 `UAV_DB_*` 变量；未提供时会回退到默认值。
-- `AMAP_WEB_KEY` 仅在需要地图功能时配置。
-- `ALLOW_SELF_REGISTER=0` 表示默认不开放注册；本地需要临时注册时可以改成 `1`。
-- 默认管理员账号和 `dev-local-secret` 仅限本地自用。
-
-## 快速开始
-
-### 1. 安装依赖
-
-后端：
+Initialize the database:
 
 ```powershell
-cd E:\Code\Project4\backend
-python -m pip install -r requirements.txt
+python tools/dev/create_database.py
 ```
 
-桌面端：
+Preview the resolved settings without connecting:
 
 ```powershell
-cd E:\Code\Project4\desktop
-python -m pip install -r requirements.txt
+python tools/dev/create_database.py --dry-run
 ```
 
-### 2. 初始化数据库
-
-推荐直接使用根目录脚本：
+Reset local development data and seed test data:
 
 ```powershell
-cd E:\Code\Project4
-.\create_database.bat
+mysql -u root -p robot_monitor < apps/backend/db/reset-db-dev.sql
+python tools/dev/create_database.py
+mysql -u root -p robot_monitor < apps/backend/db/seed-dev.sql
 ```
 
-等价命令：
+## Backend Startup
+
+Recommended:
 
 ```powershell
-cd E:\Code\Project4
-python scripts\create_database.py --with-device-pin
+./start-dev.ps1
 ```
 
-这个步骤会：
-
-- 创建目标数据库
-- 执行 `backend/db/mysql_schema.sql`
-- 可选创建桌面端使用的 `device_pin` 表
-
-本地清库重来：
+Manual startup:
 
 ```powershell
-mysql -u root -p robot_monitor < backend\db\reset-db-dev.sql
-python scripts\create_database.py --with-device-pin
+python -m uvicorn ugv_backend.main:app --app-dir apps/backend/src --host 127.0.0.1 --port 8000 --reload
 ```
 
-导入本地测试数据：
+## Device and Deployment Tools
 
-```powershell
-mysql -u root -p robot_monitor < backend\db\seed-dev.sql
-```
-
-### 3. 启动 Web 后端
-
-最省事的方式：
-
-```powershell
-cd E:\Code\Project4
-.\start-dev.ps1
-```
-
-或手动启动：
-
-```powershell
-cd E:\Code\Project4\backend
-python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-启动后可访问：
-
-- 本机直连登录页：<http://127.0.0.1:8000/login>
-- 本机直连健康检查：<http://127.0.0.1:8000/api/health>
-
-说明：
-
-- 本地开发默认只绑定 `127.0.0.1`，避免无意暴露到局域网。
-- 如果确实需要局域网访问，可以运行 `.\start-dev.ps1 -HostName 0.0.0.0`。
-
-如果没有在环境变量中覆盖管理员账号，默认登录信息为：
-
-- 用户名：`admin`
-- 密码：`admin123`
-
-### 4. Web 本地发布验收
-
-从全新 clone 验收 Web 端时，先按上面的依赖、`.env` 和数据库步骤准备环境，然后运行：
-
-```powershell
-cd E:\Code\Project4
-python scripts\local_release_smoke.py --static
-```
-
-启动后端后，在另一个终端运行：
-
-```powershell
-python scripts\local_release_smoke.py --web --backend-url http://127.0.0.1:8000
-```
-
-再用浏览器人工确认：登录页、Dashboard、设备管理、用户管理、集群管理、编队管理页面均可打开。本轮 Web 验收不包含桌面端启动、断开或重连检查。
-
-### 5. 启动桌面端
-
-```powershell
-cd E:\Code\Project4\desktop
-python main.py
-```
-
-也可以从根目录运行：
-
-```powershell
-.\start-desktop.ps1
-```
-
-桌面端会读取根目录 `.env` 中的 `UAV_DB_*` 配置连接数据库。
-
-## IoT 相关脚本
-
-仓库已经包含设备侧接入的基础脚本，适合做本地联调或树莓派部署。
-
-### 初始化 IoT 后端表并生成设备 Token
-
-```powershell
-cd E:\Code\Project4
-python scripts\bootstrap_iot_backend.py --device-id 2
-```
-
-该脚本会补充创建：
-
-- `device_tokens`
-- `device_checkins`
-- `device_telemetry`
-
-如果目标设备存在，还会为该设备生成或复用一个可用 Token。
-
-### 本地运行 IoT 客户端
-
-```powershell
-cd E:\Code\Project4\scripts
-python iot_client.py --server http://127.0.0.1:8000 --token <DEVICE_TOKEN>
-```
-
-如果要单独诊断树莓派 GPS，可执行：
-
-```powershell
-cd E:\Code\Project4\scripts
-python iot_client.py --server http://127.0.0.1:8000 --token <DEVICE_TOKEN> --gps-diagnose
-```
-
-如果 GPS 模块走固定串口，也可以显式指定：
-
-```powershell
-python iot_client.py --server http://127.0.0.1:8000 --token <DEVICE_TOKEN> --gps-diagnose --gps-serial-device /dev/ttyAMA0 --gps-serial-baud 9600
-```
-
-诊断输出会优先检查：
-
-- `gpspipe -w` 是否能返回 `TPV`
-- `gpspipe -r` 是否能读到原始 NMEA
-- 指定串口或常见串口设备是否有原始输出
-
-遥测上报时，`extra.gps` 里也会带上当前 GPS 状态摘要，便于在服务端排查“未安装 gpspipe / 有 NMEA 但无 fix / 串口完全无输出”等问题。
-
-如果设备没有 GPS，也可以启用“网络定位 fallback”：
-
-- 当前脚本支持 `Google Geolocation API`
-- 有 Wi-Fi 扫描权限时会优先上传附近热点信息
-- 扫描不到热点时，可按配置退回到公网 IP 粗定位
-
-示例配置：
-
-```ini
-network_locate_enabled = 1
-network_provider = google
-network_api_key = <YOUR_GOOGLE_GEOLOCATION_API_KEY>
-network_api_url = https://www.googleapis.com/geolocation/v1/geolocate
-network_timeout = 10
-network_interface = wlan0
-network_consider_ip = 1
-```
-
-说明：
-
-- 网络定位精度通常明显弱于 GPS，建议只作为兜底方案。
-- `network_consider_ip = 1` 时，即使没有 Wi-Fi 扫描结果，也可能返回一个较粗的 IP 定位。
-- 若设备侧没有开启扫描权限，脚本仍会继续工作，只是会更依赖 IP 粗定位。
-
-### LiDAR 雷达接入
-
-LiDAR 走 `scripts/ros_iot_bridge.py`，要求车端 ROS 已发布 `sensor_msgs/LaserScan` 话题，并且后台已经为对应设备生成 `X-Device-Token`。
-
-1. 在后台或脚本中创建设备 Token：
-
-```powershell
-python scripts\bootstrap_iot_backend.py --device-id <DEVICE_ID>
-```
-
-2. 在车端 `scripts/iot_client.conf` 中配置后端地址、Token 和雷达话题：
-
-```ini
-[client]
-server = http://<BACKEND_LAN_IP>:8000
-token = <DEVICE_TOKEN>
-
-[sensors]
-lidar_topic = /scan
-lidar_interval = 1
-```
-
-3. 启动 bridge：
-
-```bash
-cd ~/project4/scripts
-python3 ros_iot_bridge.py --config iot_client.conf
-```
-
-4. 接入前可先诊断 `/scan`：
-
-```bash
-python3 scripts/diagnose_lidar_ros.py --topic /scan --duration 5 --min-hz 1
-```
-
-诊断会检查话题是否存在、扫描频率是否达标、`ranges` 是否存在正有限距离值。后台页面在 `/sensors`，选择对应机器人后可查看 LiDAR 画布、最近障碍物距离、左前/正前/右前分区最小距离，并可复制或下载最新雷达 JSON。
-
-### 当前设备现状
-
-基于 `192.168.31.200` 这台树莓派设备的实际排查结果，当前状态如下：
-
-- 后端遥测上报正常，来源 IP 为 `192.168.31.200`
-- 当前稳定上报字段包括：
-  - `status`
-  - `signal`
-  - `extra.cpu_temp_c`
-  - `reportedAt`
-  - `extra.gps.status / source / message`
-  - `extra.locationSource`
-- 当前未产生巡检打卡记录，因为配置仍是 `point_id = 0`、`route_id = 0`
-
-### GPS 现状
-
-当前设备没有产出可用 GPS 坐标，已经确认的现象包括：
-
-- `gpsd` 和 `gpspipe` 已安装并可运行
-- `gpspipe -w` 只能返回 `VERSION / DEVICES / WATCH`
-- `gpspipe -r` 没有返回任何 NMEA 数据
-- `/dev/ttyAMA0`、`/dev/ttyS0` 在多轮诊断和多波特率扫描下都没有输出
-- 已移除 `/boot/cmdline.txt` 中的 `console=serial0,115200`
-- 已禁用 `serial-getty@ttyS0.service`
-
-结论：
-
-- 当前更像是“设备没有接入可工作的 GPS 模块”或“GPS 模块没有向树莓派串口输出数据”
-- 如果后续需要位置能力，优先级建议为：
-  1. 接入真实 GPS 模块
-  2. 或启用网络定位 fallback
-
-### 电池信息现状
-
-当前设备还不能上传电池信息，已确认：
-
-- `/sys/class/power_supply` 为空，没有 `BAT0`
-- 没发现 `INA219 / INA226 / MAX17040 / BQ*` 等常见电量采集芯片或驱动
-- I2C 总线上的 `0x40` 设备更像 `PCA9685` PWM 控制器，而不是电池计量芯片
-
-结论：
-
-- 目前系统里没有发现可直接读取的电池信息源
-- 如果后续需要电池百分比，需要额外接入：
-  - UPS / BMS / fuel gauge 芯片
-  - 或者由下位控制板通过串口 / I2C / HTTP 回传电压与电量
-
-### 部署到树莓派
-
-Linux 侧脚本：
-
-```bash
-bash scripts/setup_pi_iot.sh <SERVER_URL> <DEVICE_TOKEN> [INTERVAL] [POINT_ID] [ROUTE_ID] [GPS_SERIAL_DEVICE] [GPS_SERIAL_BAUD]
-```
-
-Windows 远程部署脚本：
-
-```powershell
-python scripts\deploy_iot_client.py --host <PI_HOST> --password <PI_PASSWORD> --server <SERVER_URL> --token <DEVICE_TOKEN> --gps-serial-device /dev/ttyAMA0 --network-locate-enabled --network-api-key <GOOGLE_API_KEY>
-```
-
-## 常用脚本
-
-| 脚本 | 作用 |
+| Path | Purpose |
 | --- | --- |
-| `start.bat` / `start.ps1` | 启动 Web 后端 |
-| `create_database.bat` | 初始化数据库和表结构 |
-| `test_mysql_connection.bat` | 诊断本地 MySQL 连通性 |
-| `scripts/create_database.py` | 命令行建库建表 |
-| `scripts/test_mysql_connection.py` | 输出详细诊断日志到 `logs/` |
-| `scripts/bootstrap_iot_backend.py` | 初始化 IoT 表并生成设备 Token |
-| `scripts/iot_client.py` | 设备侧打卡与遥测上报客户端 |
-| `scripts/deploy_iot_client.py` | 将 IoT 客户端远程部署到树莓派 |
+| `tools/dev/bootstrap_iot_backend.py` | Create IoT tables and device tokens |
+| `tools/dev/test_mysql_connection.py` | Diagnose MySQL connectivity |
+| `tools/dev/local_release_smoke.py` | Run local release checks |
+| `tools/device/iot_client.py` | Send device check-ins and telemetry |
+| `tools/device/robot_control_server.py` | Run the device-side control service |
+| `tools/deploy/deploy_iot_client.py` | Deploy the IoT client remotely |
+| `tools/deploy/setup_pi_iot.sh` | Set up the Linux device client |
 
-## 测试与排查
+## Tests
 
-后端基础测试：
-
-```powershell
-cd E:\Code\Project4
-python -m pytest backend\tests -q
-```
-
-数据库连通性诊断：
+Install development dependencies:
 
 ```powershell
-cd E:\Code\Project4
-.\test_mysql_connection.bat
+python -m pip install -r requirements-dev.txt
 ```
 
-诊断日志会输出到根目录 `logs/`。
+Run backend and tool tests:
 
-## 本地常见错误
+```powershell
+python -m pytest tests/backend tests/tools -q
+```
 
-### MySQL 连不上
+Run static release checks:
 
-- 确认 MySQL 服务已启动。
-- 确认 `.env` 里的 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_DATABASE` 正确。
-- 可先运行 `python scripts\create_database.py --dry-run` 看当前解析到的配置。
+```powershell
+python tools/dev/local_release_smoke.py --static
+```
 
-### 端口被占用
+Run web checks after starting the backend:
 
-- 默认后端端口是 `8000`。
-- 临时换端口：`.\start-dev.ps1 -Port 8001`。
-- 或在 `.env` 中修改 `BACKEND_PORT=8001`。
+```powershell
+python tools/dev/local_release_smoke.py --web --backend-url http://127.0.0.1:8000
+```
 
-### 依赖安装失败
+## Documentation
 
-- 推荐 Python 3.11。
-- 先升级 pip：`python -m pip install -U pip`。
-- 后端依赖：`python -m pip install -r backend\requirements.txt`。
-- 桌面端依赖：`python -m pip install -r desktop\requirements.txt`。
+- Backend details: `apps/backend/README.md`
+- Remote control guide: `docs/guides/remote-control.md`
+- Local release checklist: `docs/checklists/local-release-checklist.md`
+- Autopilot local test: `docs/checklists/autopilot-local-test.md`
+- Planning files: `docs/planning/`
 
-### 登录失败
+## Common Problems
 
-- 默认本地账号是 `admin / admin123`，仅限本地自用。
-- 如果改过 `.env` 的 `ADMIN_USERNAME` 或 `ADMIN_PASSWORD`，以 `.env` 为准。
-- 如果数据库里已有旧管理员账号，修改 `.env` 不会自动覆盖旧密码；本地可用 `backend\db\reset-db-dev.sql` 清库后重新初始化。
+### MySQL cannot connect
 
-### 桌面端打不开
+- Confirm the MySQL service is running.
+- Check `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, and `MYSQL_DATABASE` in `.env`.
+- Run `python tools/dev/create_database.py --dry-run` to verify the values being read.
 
-- 先确认后端能打开：<http://127.0.0.1:8000/api/health>。
-- 从仓库根目录运行 `.\start-desktop.ps1`，它会先检查后端状态。
-- 如果提示缺少 PyQt，运行 `python -m pip install -r desktop\requirements.txt`。
+### Port already in use
 
-## 子模块文档
+The default port is `8000`. Use another port temporarily:
 
-- Web 端说明见 [backend/README.md](./backend/README.md)
-- 桌面端说明见 [desktop/README.md](./desktop/README.md)
+```powershell
+./start-dev.ps1 -Port 8001
+```
 
-## 开发备注
+### Dependency installation fails
 
-- 根目录 `README.md` 负责项目总览与启动入口。
-- `backend/README.md` 更适合写 API、页面路由和后端细节。
-- `desktop/README.md` 更适合写桌面端 UI、环境和模块说明。
-- 当前仓库仍处于联调阶段，文档会随着阶段五测试推进继续补充。
+```powershell
+python -m pip install -U pip
+python -m pip install -r requirements.txt
+```

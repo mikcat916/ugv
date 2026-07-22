@@ -66,17 +66,20 @@ Thumbs.db
 logs/
 test-results/
 .claude/worktrees/
-backend/static/uploads/
+apps/backend/static/uploads/
+var/uploads/*
+!var/uploads/.gitkeep
 pytest-cache-files-*/
 backend/pytest-cache-files-*/
 robot_monitor_dump.sql
 *.db
 *.sqlite
 *.sqlite3
-desktop/MICCProject1/config.ini
-
 # Tooling
 .ppt-tools/node_modules/
 e2e/playwright-report/
 e2e/test-results/
 e2e/.auth/
+tests/e2e/playwright-report/
+tests/e2e/test-results/
+tests/e2e/.auth/

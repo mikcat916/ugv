@@ -10,7 +10,7 @@
 ## 验证结果
 
 - 后端核心回归：`156 passed`。
-- 前端静态检查：`node --check backend/static/dashboard.js` 通过。
+- 前端静态检查：`node --check apps/backend/static/dashboard.js` 通过。
 - Playwright E2E：`12 passed, 3 skipped`，目标环境为 `https://192.168.31.169`。
 - 远端服务：`project4-backend.service` 为 `active`，`mysql.service` 为 `active`。
 - 远端页面：登录页返回 `200`，登录后 `/overview`、`/device-management`、`/cluster-management`、`/control`、`/device-control`、`/cluster-control` 均返回 `200`。
@@ -21,7 +21,7 @@
 - 部署目录：`/home/oneday/project4`
 - 后端服务：`project4-backend.service`
 - 备份目录：`/home/oneday/project4/.codex-backup-stabilization-20260527-105355`
-- 依赖检查：`backend/requirements.txt` 已在远端虚拟环境安装确认。
+- 依赖检查：`apps/backend/requirements.txt` 已在远端虚拟环境安装确认。
 
 ## 已知边界
 

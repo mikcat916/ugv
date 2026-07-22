@@ -10,7 +10,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
-$BackendDir = Join-Path $Root "backend"
+$BackendDir = Join-Path $Root "apps\backend"
+$BackendSrc = Join-Path $BackendDir "src"
 $EnvFile = Join-Path $Root ".env"
 $EnvExample = Join-Path $Root ".env.example"
 $Python = $null
@@ -112,14 +113,14 @@ if (-not $SkipInstall) {
 }
 
 Info "Checking MySQL and schema..."
-& $Python (Join-Path $Root "scripts\create_database.py") --dry-run
+& $Python (Join-Path $Root "tools\dev\create_database.py") --dry-run
 if ($LASTEXITCODE -ne 0) {
     Fail "Unable to read MySQL configuration. Check .env."
     exit 1
 }
 
 if (-not $SkipDbInit) {
-    & $Python (Join-Path $Root "scripts\create_database.py") --with-device-pin
+    & $Python (Join-Path $Root "tools\dev\create_database.py")
     if ($LASTEXITCODE -ne 0) {
         Fail "Database initialization failed."
         Write-Host ""
@@ -144,5 +145,5 @@ Info "Health check: http://${HostName}:$Port/api/health"
 Info "Press Ctrl+C to stop."
 Write-Host ""
 
-Set-Location $BackendDir
-& $Python -m uvicorn main:app --host $HostName --port $Port --reload
+Set-Location $Root
+& $Python -m uvicorn ugv_backend.main:app --app-dir $BackendSrc --host $HostName --port $Port --reload

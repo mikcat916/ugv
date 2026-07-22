@@ -16,7 +16,7 @@ echo.
 echo Python: %PYTHON%
 echo.
 
-%PYTHON% "%ROOT%scripts\create_database.py" --with-device-pin %*
+%PYTHON% "%ROOT%tools\dev\create_database.py" %*
 set "EXITCODE=%ERRORLEVEL%"
 
 echo.

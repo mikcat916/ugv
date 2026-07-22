@@ -14,7 +14,7 @@ echo  Project4 - MySQL Diagnose
 echo ==========================================
 echo.
 
-%PYTHON% "%ROOT%scripts\test_mysql_connection.py" %*
+%PYTHON% "%ROOT%tools\dev\test_mysql_connection.py" %*
 set "EXITCODE=%ERRORLEVEL%"
 
 echo.
