@@ -128,3 +128,22 @@ def admin_username() -> str:
 
 def session_secret() -> str:
     return os.getenv("SESSION_SECRET", "dev-local-secret")
+
+
+def control_gateway_url() -> str:
+    return os.getenv("CONTROL_GATEWAY_URL", "").strip().rstrip("/")
+
+
+def control_gateway_token() -> str:
+    return os.getenv("CONTROL_GATEWAY_TOKEN", "").strip()
+
+
+def control_gateway_timeout_seconds() -> float:
+    raw_value = os.getenv("CONTROL_GATEWAY_TIMEOUT_SECONDS", "5").strip() or "5"
+    try:
+        value = float(raw_value)
+    except ValueError as exc:
+        raise ValueError("CONTROL_GATEWAY_TIMEOUT_SECONDS must be a number.") from exc
+    if value <= 0 or value > 60:
+        raise ValueError("CONTROL_GATEWAY_TIMEOUT_SECONDS must be greater than 0 and at most 60.")
+    return value

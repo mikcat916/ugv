@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "检查失败是否被正确记录且不会伪造成功"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "检查命令状态和节点退出副作用顺序"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "检查测试覆盖、权限和真实网络隔离"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "检查后端与网关协议字段和状态含义一致"}

@@ -438,7 +438,7 @@ def test_unified_control_command_forwards_robot_motion(monkeypatch):
     assert any(params and params[0] == "success" for _, params in writes)
 
 
-def test_unified_control_gateway_missing_returns_502_and_failed_record(monkeypatch):
+def test_unified_control_rejects_unsupported_sensor_target(monkeypatch):
     mock_auth(monkeypatch)
     writes = []
     monkeypatch.setattr(app_module, "query_one", lambda sql, params=None: {"id": 1})
@@ -458,12 +458,12 @@ def test_unified_control_gateway_missing_returns_502_and_failed_record(monkeypat
             },
         )
 
-    assert response.status_code == 502
-    assert "真实控制网关未配置" in response.json()["detail"]
+    assert response.status_code == 422
+    assert "仅支持集群节点" in response.json()["detail"]
     assert any(params and params[0] == "failed" for _, params in writes)
 
 
-def test_unified_control_missing_gateway_target_returns_404(monkeypatch):
+def test_unified_control_rejects_unsupported_network_target(monkeypatch):
     mock_auth(monkeypatch)
     writes = []
     monkeypatch.setattr(app_module, "query_one", lambda sql, params=None: None)
@@ -483,8 +483,8 @@ def test_unified_control_missing_gateway_target_returns_404(monkeypatch):
             },
         )
 
-    assert response.status_code == 404
-    assert "未找到对应控制目标" in response.json()["detail"]
+    assert response.status_code == 422
+    assert "仅支持集群节点" in response.json()["detail"]
     assert any(params and params[0] == "failed" for _, params in writes)
 
 

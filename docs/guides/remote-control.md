@@ -31,12 +31,24 @@ flowchart LR
 - 控制链路：`Web 页面 -> /api/robot-control/* -> 树莓派 TCP 控制服务 -> 串口电机板`
 - 遥测链路：`tools/device/iot_client.py -> /api/iot/telemetry -> Web 看板`
 
+管理后台里的非单机器人命令还多一层控制网关：
+
+```text
+Web 管理后台 -> POST /api/control/commands -> Web 后端 -> 控制网关 :9100 -> 机器人 TCP 控制服务 :9000
+```
+
+两条控制路径不要混淆：
+
+- 单机器人控制和 `/api/robot-control/*` 继续由 Web 后端直接连接机器人，不经过控制网关。
+- 控制网关第一版只处理 `cluster_node`，并且只支持 `connectivity_test` 和 `node_exit`。
+
 ## 关键文件
 
 | 文件 | 作用 |
 | --- | --- |
 | `apps/backend/src/ugv_backend/app_core.py` | 提供控制接口、目标解析、TCP 转发和控制命令记录 |
 | `apps/backend/static/dashboard.js` | 渲染远程遥控页面，处理按住方向键持续发送指令 |
+| `tools/device/control_gateway.py` | 运行独立 HTTP 控制网关，校验并转发集群节点命令 |
 | `tools/device/robot_control_server.py` | 运行在树莓派上的 TCP 控制服务 |
 | `tools/device/iot_client.py` | 运行在树莓派上的遥测和打卡上报客户端 |
 | `tools/dev/bootstrap_iot_backend.py` | 初始化 IoT 表并生成设备 Token |
@@ -141,6 +153,75 @@ ROBOT_CONTROL_HOST=192.168.31.200
 - 机器人未配置 IP 返回 `422`。
 
 这种处理方式让故障直接暴露在页面和测试中，便于定位真实问题。
+
+### 4.1 配置并启动真实控制网关
+
+控制网关脚本是 `tools/device/control_gateway.py`。它会读取仓库根目录 `.env`，默认监听 `127.0.0.1:9100`。
+
+建议先使用下面的安全配置：
+
+```env
+CONTROL_GATEWAY_URL=http://127.0.0.1:9100
+CONTROL_GATEWAY_HOST=127.0.0.1
+CONTROL_GATEWAY_PORT=9100
+CONTROL_GATEWAY_TOKEN=replace-with-a-long-random-token
+CONTROL_GATEWAY_TIMEOUT_SECONDS=5
+CONTROL_GATEWAY_MODE=dry_run
+ROBOT_CONTROL_PORT=9000
+ROBOT_CONTROL_TIMEOUT_SECONDS=2
+```
+
+说明：
+
+- `CONTROL_GATEWAY_URL` 是 Web 后端访问网关的地址。
+- `CONTROL_GATEWAY_HOST` 和 `CONTROL_GATEWAY_PORT` 是网关自己的监听地址和端口。
+- 后端和网关读取同一个 `CONTROL_GATEWAY_TOKEN`。后端请求时会发送 `Authorization: Bearer <Token>`；Token 为空、不同或请求未携带 Token 时，命令不会执行。
+- `CONTROL_GATEWAY_TIMEOUT_SECONDS` 是后端等待网关的时间，默认 `5` 秒。
+- `ROBOT_CONTROL_TIMEOUT_SECONDS` 是网关等待机器人 TCP 控制服务的时间，默认 `2` 秒。
+
+在仓库根目录启动网关：
+
+```powershell
+cd E:\Code\Project4
+python tools\device\control_gateway.py
+```
+
+健康检查地址是 `http://127.0.0.1:9100/health`。它只报告当前模式和 Token 是否已配置，不会返回 Token 内容。
+
+#### `dry_run` 默认安全模式
+
+未设置 `CONTROL_GATEWAY_MODE` 时，网关默认使用 `dry_run`。在这个模式下：
+
+- 网关会检查 Token、请求内容、目标类型和命令类型。
+- 网关返回 `ok=true`、`executed=false` 和 `mode=dry_run`。
+- 不会建立机器人 TCP 连接，不会发送 `ping` 或 `stop`。
+- 后端把命令记录为 `simulated`，不会更新集群节点状态。
+
+#### `live` 真实执行模式
+
+只有明确设置下面的值并重启网关后，才会连接真实机器人：
+
+```env
+CONTROL_GATEWAY_MODE=live
+```
+
+`live` 模式当前仅支持：
+
+| 目标类型 | 命令 | 实际动作 |
+| --- | --- | --- |
+| `cluster_node` | `connectivity_test` | 向关联机器人的 IPv4 地址和 `ROBOT_CONTROL_PORT` 发送 `ping`，收到 `pong` 后成功 |
+| `cluster_node` | `node_exit` | 先发送 `stop`，收到类型为 `ack` 且 `ok=true` 后成功 |
+
+任何其他目标或命令都会返回错误，不会伪造成功。机器人 IP 缺失、连接失败、超时、返回格式错误或拒绝停车时，后端把命令记录为 `failed`。
+
+`node_exit` 必须按这个顺序执行：
+
+1. 网关向节点关联机器人发送 `stop`。
+2. 网关确认收到 `ok=true` 的 `ack`。
+3. 网关向后端返回 `executed=true`。
+4. 后端才把该节点状态更新为 `disconnected`，并清空 `joined_at`。
+
+只要停车没有确认成功，或者网关处于 `dry_run`，第 4 步就不会发生。
 
 ### 5. 开发 Web 控制页面
 

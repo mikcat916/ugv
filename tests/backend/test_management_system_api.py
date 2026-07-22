@@ -43,6 +43,66 @@ def mock_auth(monkeypatch):
     monkeypatch.setattr(app_module, "verify_password", lambda password, password_hash: True)
 
 
+def mock_control_gateway_dependencies(monkeypatch, *, gateway_url="http://gateway.test", token="test-token"):
+    mock_auth(monkeypatch)
+    command_updates = []
+    node_updates = []
+
+    def fake_update_control_command(command_id, status, response=None, error="", completed=True):
+        command_updates.append({"command_id": command_id, "status": status, "response": response, "error": error})
+        return 1
+
+    def fake_execute_write(sql, params=None):
+        if "UPDATE cluster_nodes SET status = 'disconnected'" in sql:
+            node_updates.append((sql, params))
+        return 1
+
+    monkeypatch.setattr(app_module, "insert_control_command", lambda record: 101)
+    monkeypatch.setattr(app_module, "update_control_command", fake_update_control_command)
+    monkeypatch.setattr(app_module, "execute_write", fake_execute_write)
+    monkeypatch.setattr(
+        app_module,
+        "query_one",
+        lambda sql, params=None: {"id": 7, "cluster_id": 3, "robot_id": 9, "ip_address": "192.0.2.10"},
+    )
+    monkeypatch.setattr(app_module, "robot_control_port", lambda: 9000)
+    monkeypatch.setattr(app_module, "control_gateway_url", lambda: gateway_url)
+    monkeypatch.setattr(app_module, "control_gateway_token", lambda: token)
+    monkeypatch.setattr(app_module, "control_gateway_timeout_seconds", lambda: 5.0)
+    return command_updates, node_updates
+
+
+def mock_gateway_http(monkeypatch, *, response=None, error=None):
+    calls = []
+
+    class FakeAsyncClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return False
+
+        async def post(self, url, **kwargs):
+            calls.append({"url": url, **kwargs, "client": self.kwargs})
+            if error is not None:
+                raise error
+            return response
+
+    monkeypatch.setattr(app_module.httpx, "AsyncClient", FakeAsyncClient)
+    return calls
+
+
+def forbid_gateway_http(monkeypatch):
+    class ForbiddenAsyncClient:
+        def __init__(self, **kwargs):
+            pytest.fail("gateway HTTP client must not be created")
+
+    monkeypatch.setattr(app_module.httpx, "AsyncClient", ForbiddenAsyncClient)
+
+
 def test_duplicate_device_category_name_returns_409(monkeypatch):
     monkeypatch.setattr(app_module, "query_one", lambda sql, params=None: {"id": 1})
 
@@ -255,3 +315,224 @@ def test_apply_control_success_side_effect_clears_joined_at_on_exit(monkeypatch)
     app_module.apply_control_success_side_effect({"targetType": "cluster_node", "targetId": 7, "commandType": "node_exit"})
 
     assert calls == [("UPDATE cluster_nodes SET status = 'disconnected', joined_at = NULL WHERE id = %s", (7,))]
+
+
+def test_create_control_command_executes_node_exit_and_updates_node_after_gateway_confirmation(monkeypatch):
+    command_updates, node_updates = mock_control_gateway_dependencies(monkeypatch)
+    gateway_response = {
+        "ok": True,
+        "executed": True,
+        "mode": "live",
+        "commandId": 101,
+        "message": "node stopped",
+    }
+    calls = mock_gateway_http(monkeypatch, response=app_module.httpx.Response(200, json=gateway_response))
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.post(
+            "/api/control/commands",
+            json={"targetType": "cluster_node", "targetId": 7, "commandType": "node_exit", "params": {}},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "commandId": 101, "response": gateway_response}
+    assert command_updates == [
+        {"command_id": 101, "status": "success", "response": gateway_response, "error": ""}
+    ]
+    assert node_updates == [
+        ("UPDATE cluster_nodes SET status = 'disconnected', joined_at = NULL WHERE id = %s", (7,))
+    ]
+    assert calls[0]["url"] == "http://gateway.test/v1/commands"
+    assert calls[0]["headers"] == {"Authorization": "Bearer test-token"}
+    assert calls[0]["json"] == {
+        "commandId": 101,
+        "targetType": "cluster_node",
+        "targetId": 7,
+        "commandType": "node_exit",
+        "params": {},
+        "target": {"clusterNodeId": 7, "clusterId": 3, "robotId": 9, "host": "192.0.2.10", "port": 9000},
+    }
+
+
+def test_create_control_command_dry_run_does_not_update_node(monkeypatch):
+    command_updates, node_updates = mock_control_gateway_dependencies(monkeypatch)
+    gateway_response = {
+        "ok": True,
+        "executed": False,
+        "mode": "dry_run",
+        "commandId": 101,
+        "message": "simulated",
+    }
+    mock_gateway_http(monkeypatch, response=app_module.httpx.Response(200, json=gateway_response))
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.post(
+            "/api/control/commands",
+            json={"targetType": "cluster_node", "targetId": 7, "commandType": "node_exit"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["simulated"] is True
+    assert command_updates == [
+        {"command_id": 101, "status": "simulated", "response": gateway_response, "error": ""}
+    ]
+    assert node_updates == []
+
+
+def test_create_control_command_gateway_rejection_marks_failed_without_updating_node(monkeypatch):
+    command_updates, node_updates = mock_control_gateway_dependencies(monkeypatch)
+    mock_gateway_http(
+        monkeypatch,
+        response=app_module.httpx.Response(409, json={"ok": False, "executed": False, "detail": "stop rejected"}),
+    )
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.post(
+            "/api/control/commands",
+            json={"targetType": "cluster_node", "targetId": 7, "commandType": "node_exit"},
+        )
+
+    assert response.status_code == 502
+    assert "stop rejected" in response.json()["detail"]
+    assert command_updates == [
+        {"command_id": 101, "status": "failed", "response": None, "error": "控制网关拒绝命令：stop rejected"}
+    ]
+    assert node_updates == []
+
+
+def test_create_control_command_gateway_timeout_marks_failed_without_updating_node(monkeypatch):
+    command_updates, node_updates = mock_control_gateway_dependencies(monkeypatch)
+    mock_gateway_http(monkeypatch, error=app_module.httpx.ReadTimeout("gateway timeout"))
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.post(
+            "/api/control/commands",
+            json={"targetType": "cluster_node", "targetId": 7, "commandType": "node_exit"},
+        )
+
+    assert response.status_code == 504
+    assert response.json()["detail"] == "控制网关响应超时。"
+    assert command_updates == [
+        {"command_id": 101, "status": "failed", "response": None, "error": "控制网关响应超时。"}
+    ]
+    assert node_updates == []
+
+
+def test_create_control_command_invalid_gateway_json_marks_failed_without_updating_node(monkeypatch):
+    command_updates, node_updates = mock_control_gateway_dependencies(monkeypatch)
+    mock_gateway_http(monkeypatch, response=app_module.httpx.Response(200, content=b"not-json"))
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.post(
+            "/api/control/commands",
+            json={"targetType": "cluster_node", "targetId": 7, "commandType": "node_exit"},
+        )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "控制网关返回了无效 JSON。"
+    assert command_updates == [
+        {"command_id": 101, "status": "failed", "response": None, "error": "控制网关返回了无效 JSON。"}
+    ]
+    assert node_updates == []
+
+
+@pytest.mark.parametrize(
+    ("gateway_url", "token", "expected_status", "expected_detail"),
+    [
+        ("", "test-token", 502, "真实控制网关未配置，无法下发该控制命令。"),
+        ("http://gateway.test", "", 500, "控制网关 Token 未配置。"),
+    ],
+)
+def test_create_control_command_rejects_missing_gateway_configuration(
+    monkeypatch, gateway_url, token, expected_status, expected_detail
+):
+    command_updates, node_updates = mock_control_gateway_dependencies(
+        monkeypatch, gateway_url=gateway_url, token=token
+    )
+    forbid_gateway_http(monkeypatch)
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.post(
+            "/api/control/commands",
+            json={"targetType": "cluster_node", "targetId": 7, "commandType": "node_exit"},
+        )
+
+    assert response.status_code == expected_status
+    assert response.json()["detail"] == expected_detail
+    assert command_updates == [
+        {"command_id": 101, "status": "failed", "response": None, "error": expected_detail}
+    ]
+    assert node_updates == []
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected_detail"),
+    [
+        (
+            {"targetType": "device", "targetId": 7, "commandType": "node_exit"},
+            "第一版控制网关仅支持集群节点。",
+        ),
+        (
+            {"targetType": "cluster_node", "targetId": 7, "commandType": "restart"},
+            "控制网关仅支持连通性检测和节点退出命令。",
+        ),
+    ],
+)
+def test_create_control_command_rejects_unsupported_gateway_target_or_command(monkeypatch, payload, expected_detail):
+    command_updates, node_updates = mock_control_gateway_dependencies(monkeypatch)
+    forbid_gateway_http(monkeypatch)
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.post("/api/control/commands", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == expected_detail
+    assert command_updates == [
+        {"command_id": 101, "status": "failed", "response": None, "error": expected_detail}
+    ]
+    assert node_updates == []
+
+
+@pytest.mark.parametrize(
+    ("gateway_response", "expected_detail"),
+    [
+        (
+            {"ok": True, "executed": True, "mode": "live"},
+            "控制网关返回了不匹配的命令编号。",
+        ),
+        (
+            {"ok": True, "executed": True, "mode": "dry_run", "commandId": 101},
+            "控制网关真实执行结果缺少 live 模式标记。",
+        ),
+        (
+            {"ok": True, "executed": False, "mode": "live", "commandId": 101},
+            "控制网关模拟结果缺少 dry_run 模式标记。",
+        ),
+    ],
+)
+def test_create_control_command_rejects_inconsistent_gateway_success_response(
+    monkeypatch, gateway_response, expected_detail
+):
+    command_updates, node_updates = mock_control_gateway_dependencies(monkeypatch)
+    mock_gateway_http(monkeypatch, response=app_module.httpx.Response(200, json=gateway_response))
+
+    with TestClient(app_module.app) as client:
+        login(client)
+        response = client.post(
+            "/api/control/commands",
+            json={"targetType": "cluster_node", "targetId": 7, "commandType": "node_exit"},
+        )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == expected_detail
+    assert command_updates == [
+        {"command_id": 101, "status": "failed", "response": None, "error": expected_detail}
+    ]
+    assert node_updates == []

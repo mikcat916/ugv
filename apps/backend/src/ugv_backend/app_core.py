@@ -49,6 +49,9 @@ from .config import (
     UPLOAD_ROOT_DIR,
     admin_username,
     asset_version,
+    control_gateway_timeout_seconds,
+    control_gateway_token,
+    control_gateway_url,
     debug_enabled,
     mysql_configured,
     mysql_settings,
@@ -118,6 +121,9 @@ CONTROL_COMMAND_PENDING_STATUS = robot_control_helpers.CONTROL_COMMAND_PENDING_S
 CONTROL_COMMAND_DELIVERED_STATUS = robot_control_helpers.CONTROL_COMMAND_DELIVERED_STATUS
 CONTROL_COMMAND_SUCCESS_STATUS = robot_control_helpers.CONTROL_COMMAND_SUCCESS_STATUS
 CONTROL_COMMAND_FAILED_STATUS = robot_control_helpers.CONTROL_COMMAND_FAILED_STATUS
+CONTROL_COMMAND_SIMULATED_STATUS = "simulated"
+CONTROL_GATEWAY_MAX_RESPONSE_BYTES = 65_536
+CONTROL_GATEWAY_SUPPORTED_COMMANDS = {"connectivity_test", "node_exit"}
 ROBOT_CONTROL_MODE = os.getenv("ROBOT_CONTROL_MODE", "direct").strip().lower() or "direct"
 AUTOPILOT_RUNTIME = autopilot_helpers.AutopilotRuntime(
     lidar_timeout_seconds=float(os.getenv("AUTOPILOT_LIDAR_TIMEOUT_SECONDS", "2") or "2"),
@@ -376,22 +382,6 @@ def validate_control_command_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {"scope": scope, "targetType": target_type, "targetId": target_id, "commandType": command_type, "params": params}
 
 
-def control_target_exists(target_type: str, target_id: int) -> bool:
-    table_map = {
-        "robot": "robots",
-        "sensor": "devices",
-        "device": "devices",
-        "network": "network_channels",
-        "network_channel": "network_channels",
-        "onboard_unit": "onboard_units",
-        "cluster_node": "cluster_nodes",
-    }
-    table = table_map.get(target_type)
-    if not table:
-        return False
-    return bool(query_one(f"SELECT id FROM {table} WHERE id = %s LIMIT 1", (target_id,)))
-
-
 def execute_direct_robot_control(record: dict[str, Any]) -> dict[str, Any]:
     command_type = record["commandType"]
     params = record.get("params") or {}
@@ -421,7 +411,106 @@ def apply_control_success_side_effect(record: dict[str, Any]) -> None:
         execute_write("UPDATE cluster_nodes SET status = 'disconnected', joined_at = NULL WHERE id = %s", (record["targetId"],))
 
 
-def create_control_command(record: dict[str, Any]) -> dict[str, Any]:
+def validate_gateway_control_record(record: dict[str, Any]) -> None:
+    if record.get("targetType") != "cluster_node":
+        raise HTTPException(status_code=422, detail="第一版控制网关仅支持集群节点。")
+    if record.get("commandType") not in CONTROL_GATEWAY_SUPPORTED_COMMANDS:
+        raise HTTPException(status_code=422, detail="控制网关仅支持连通性检测和节点退出命令。")
+
+
+def load_cluster_node_gateway_target(cluster_node_id: int) -> dict[str, Any]:
+    row = query_one(
+        """
+        SELECT cn.id, cn.cluster_id, cn.robot_id, r.ip_address
+        FROM cluster_nodes cn
+        JOIN robots r ON r.id = cn.robot_id
+        WHERE cn.id = %s
+        LIMIT 1
+        """,
+        (cluster_node_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="未找到对应集群节点。")
+    raw_ip = str(row.get("ip_address") or "").strip()
+    if not raw_ip:
+        raise HTTPException(status_code=422, detail="集群节点关联机器人未配置 IP 地址。")
+    return {
+        "clusterNodeId": int(row["id"]),
+        "clusterId": int(row["cluster_id"]),
+        "robotId": int(row["robot_id"]),
+        "host": parse_ipv4(raw_ip, "ipAddress"),
+        "port": robot_control_port(),
+    }
+
+
+def gateway_error_message(payload: Any, fallback: str) -> str:
+    if isinstance(payload, dict):
+        value = payload.get("detail") or payload.get("message") or payload.get("error")
+        if isinstance(value, str) and value.strip():
+            return value.strip()[:500]
+    return fallback
+
+
+async def execute_gateway_control(command_id: int, record: dict[str, Any]) -> dict[str, Any]:
+    validate_gateway_control_record(record)
+    target = load_cluster_node_gateway_target(record["targetId"])
+    gateway_url = control_gateway_url()
+    if not gateway_url:
+        raise HTTPException(status_code=502, detail="真实控制网关未配置，无法下发该控制命令。")
+    token = control_gateway_token()
+    if not token:
+        raise HTTPException(status_code=500, detail="控制网关 Token 未配置。")
+    try:
+        timeout_seconds = control_gateway_timeout_seconds()
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    request_payload = {
+        "commandId": command_id,
+        "targetType": record["targetType"],
+        "targetId": record["targetId"],
+        "commandType": record["commandType"],
+        "params": record.get("params") or {},
+        "target": target,
+    }
+    timeout = httpx.Timeout(timeout_seconds, connect=min(timeout_seconds, 2.0))
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(
+                f"{gateway_url}/v1/commands",
+                json=request_payload,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+    except httpx.TimeoutException as exc:
+        raise HTTPException(status_code=504, detail="控制网关响应超时。") from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="控制网关不可达。") from exc
+    if len(response.content) > CONTROL_GATEWAY_MAX_RESPONSE_BYTES:
+        raise HTTPException(status_code=502, detail="控制网关响应内容过大。")
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="控制网关返回了无效 JSON。") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=502, detail="控制网关返回格式错误。")
+    if response.status_code >= 400:
+        detail = gateway_error_message(payload, f"HTTP {response.status_code}")
+        status_code = 504 if response.status_code == 504 else 502
+        raise HTTPException(status_code=status_code, detail=f"控制网关拒绝命令：{detail}")
+    if type(payload.get("ok")) is not bool or type(payload.get("executed")) is not bool:
+        raise HTTPException(status_code=502, detail="控制网关响应缺少有效的 ok 或 executed 字段。")
+    if payload.get("commandId") != command_id:
+        raise HTTPException(status_code=502, detail="控制网关返回了不匹配的命令编号。")
+    if not payload["ok"]:
+        raise HTTPException(status_code=502, detail=f"控制网关拒绝命令：{gateway_error_message(payload, '未知原因')}")
+    mode = payload.get("mode")
+    if payload["executed"] and mode != "live":
+        raise HTTPException(status_code=502, detail="控制网关真实执行结果缺少 live 模式标记。")
+    if not payload["executed"] and mode != "dry_run":
+        raise HTTPException(status_code=502, detail="控制网关模拟结果缺少 dry_run 模式标记。")
+    return payload
+
+
+async def create_control_command(record: dict[str, Any]) -> dict[str, Any]:
     command_id = insert_control_command({**record, "status": CONTROL_COMMAND_PENDING_STATUS, "createdAt": datetime.now()})
     try:
         if record["targetType"] == "robot":
@@ -431,12 +520,13 @@ def create_control_command(record: dict[str, Any]) -> dict[str, Any]:
             update_control_command(command_id, CONTROL_COMMAND_SUCCESS_STATUS, response=result)
             apply_control_success_side_effect(record)
             return {"ok": True, "commandId": command_id, "response": result}
-        if not control_target_exists(record["targetType"], record["targetId"]):
-            raise HTTPException(status_code=404, detail="未找到对应控制目标。")
-        gateway_url = os.getenv("CONTROL_GATEWAY_URL", "").strip()
-        if not gateway_url:
-            raise HTTPException(status_code=502, detail="真实控制网关未配置，无法下发该控制命令。")
-        raise HTTPException(status_code=502, detail="真实控制网关暂未接入当前后端。")
+        result = await execute_gateway_control(command_id, record)
+        if result["executed"]:
+            update_control_command(command_id, CONTROL_COMMAND_SUCCESS_STATUS, response=result)
+            apply_control_success_side_effect(record)
+            return {"ok": True, "commandId": command_id, "response": result}
+        update_control_command(command_id, CONTROL_COMMAND_SIMULATED_STATUS, response=result)
+        return {"ok": True, "simulated": True, "commandId": command_id, "response": result}
     except HTTPException as exc:
         update_control_command(command_id, CONTROL_COMMAND_FAILED_STATUS, error=str(exc.detail))
         raise
@@ -2296,7 +2386,7 @@ async def api_robot_control_stop(request: Request) -> JSONResponse:
 async def api_create_control_command(request: Request) -> JSONResponse:
     require_admin_login(request)
     record = validate_control_command_payload(await request.json())
-    result = create_control_command(record)
+    result = await create_control_command(record)
     return JSONResponse(result)
 
 

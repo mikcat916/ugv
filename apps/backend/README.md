@@ -89,6 +89,18 @@ ADMIN_PASSWORD=admin123
 ADMIN_DISPLAY_NAME=系统管理员
 AMAP_WEB_KEY=你的高德WebJSKey
 ALLOW_SELF_REGISTER=0
+
+# 真实控制网关
+CONTROL_GATEWAY_URL=http://127.0.0.1:9100
+CONTROL_GATEWAY_HOST=127.0.0.1
+CONTROL_GATEWAY_PORT=9100
+CONTROL_GATEWAY_TOKEN=replace-with-a-long-random-token
+CONTROL_GATEWAY_TIMEOUT_SECONDS=5
+CONTROL_GATEWAY_MODE=dry_run
+
+# 机器人 TCP 控制服务
+ROBOT_CONTROL_PORT=9000
+ROBOT_CONTROL_TIMEOUT_SECONDS=2
 ```
 
 说明：
@@ -98,6 +110,9 @@ ALLOW_SELF_REGISTER=0
 - `SESSION_SECRET=dev-local-secret` 和默认管理员账号仅限本地自用。
 - 高德地图必须使用 `Web 端 JS API` 对应的 Key。
 - `ALLOW_SELF_REGISTER=1` 时允许注册；默认关闭。
+- 后端用 `CONTROL_GATEWAY_URL` 访问控制网关，默认示例端口是 `9100`。
+- 后端和控制网关必须使用同一个 `CONTROL_GATEWAY_TOKEN`。请替换示例值，不要把真实 Token 提交到仓库。
+- `CONTROL_GATEWAY_MODE` 默认是 `dry_run` 安全模式，只检查请求，不连接机器人，也不会让集群节点退出。
 
 ## 启动项目
 
@@ -126,6 +141,42 @@ python -m uvicorn ugv_backend.main:app --app-dir apps\backend\src --host 127.0.0
 
 - 本地开发默认只监听 `127.0.0.1`。
 - 需要局域网访问时再显式使用 `--host 0.0.0.0`。
+
+## 启动真实控制网关
+
+控制网关和 Web 后端是两个独立进程。先确认根目录 `.env` 已配置相同的 `CONTROL_GATEWAY_TOKEN`，再打开另一个 PowerShell 窗口：
+
+```powershell
+cd E:\Code\Project4
+python tools\device\control_gateway.py
+```
+
+网关默认监听 `127.0.0.1:9100`。可访问 `http://127.0.0.1:9100/health` 检查状态；返回内容会显示当前模式和是否已配置 Token，但不会显示 Token 本身。
+
+首次联调请保留：
+
+```env
+CONTROL_GATEWAY_MODE=dry_run
+```
+
+`dry_run` 是默认安全模式。网关会校验 Token、目标和命令，成功时返回 `executed=false`；后端把命令记录为 `simulated`，不会连接机器人，也不会修改集群节点状态。
+
+确认机器人 TCP 控制服务、IP 和端口都正确后，才可以显式改为：
+
+```env
+CONTROL_GATEWAY_MODE=live
+```
+
+修改后需要重启控制网关。`live` 模式会实际连接集群节点关联机器人的 TCP 控制服务，目标端口来自 `ROBOT_CONTROL_PORT`，默认是 `9000`。
+
+当前真实控制网关只支持以下组合：
+
+| 目标类型 | 命令 | 行为 |
+| --- | --- | --- |
+| `cluster_node` | `connectivity_test` | 发送 `ping`，只有收到 `pong` 才算成功 |
+| `cluster_node` | `node_exit` | 先发送 `stop`，只有收到 `ok=true` 的 `ack` 才算停车成功 |
+
+其他目标或命令会被拒绝。`node_exit` 的顺序固定为：先由网关确认机器人停车，再由后端把节点状态更新为 `disconnected` 并清空 `joined_at`。停车失败、超时或网关处于 `dry_run` 时都不会更新节点状态。
 
 ## 自动驾驶 API
 

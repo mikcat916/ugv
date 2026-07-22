@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "遵循后端、设备工具和测试目录的现有边界"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "统一网关、TCP 和 HTTP 失败的状态码与安全错误信息"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "正确记录命令状态并保证副作用只在成功后发生"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "按现有 pytest、monkeypatch 和静态检查方式实施"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "该功能跨浏览器 API、数据库、HTTP 网关和机器人 TCP 服务"}

@@ -32,6 +32,7 @@ def run_command(args: list[str], cwd: Path = ROOT_DIR) -> None:
 
 def static_checks() -> None:
     py_files = sorted(glob.glob(str(ROOT_DIR / "apps" / "backend" / "src" / "ugv_backend" / "*.py")))
+    py_files.append(str(ROOT_DIR / "tools" / "device" / "control_gateway.py"))
     if not py_files:
         raise SystemExit("[ERR] No backend Python files found.")
     js_files = [
